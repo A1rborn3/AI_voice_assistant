@@ -1,0 +1,18 @@
+[
+    [
+        "What is the weather like today?",
+        "The weather today will be rainy until 6 PM, then cloudy until 8 PM, and clear from 9 PM onwards."
+    ],
+    [
+        "hello",
+        "Hello! How can I help you today?"
+    ],
+    [
+        "hows the weather at 8",
+        "Can you specify which day you would like to know the weather for?"
+    ],
+    [
+        "for today 8pm",
+        "The weather at 8 PM today will be cloudy."
+    ]
+]

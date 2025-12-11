@@ -1,0 +1,19 @@
+{
+    "user": {
+        "name": "Ethan",
+        "location": "Bedroom",
+        "personality": "```json\n{\n  \"identity\": {\n    \"name\": \"Ethan\",\n    \"age\": \"\",\n    \"location\": \"Auckland, New Zealand\",\n    \"education\": \"\",\n    \"field_of_study\": \"\",\n    \"work\": \"\",\n    \"skills\": [],\n    \"other_details\": [\n      \"User has a local AI voice assistant project.\"\n    ]\n  },\n  \"interests\": [\n    \"AI\",\n    \"voice assistants\",\n    \"programming\",\n    \"kite flying\"\n  ],\n  \"hobbies\": [],\n  \"projects\": [],\n  \"technical_preferences\": [],\n  \"assistant_expectations\": [\n    \"Prefers personalized responses\",\n    \"Only greet when user says hello first\",\n    \"Prefers concise answers to simple questions\"\n  ]\n}\n```",
+        "devices": [
+            "Samsung TV",
+            "LED Strip"
+        ]
+    },
+    "assistant": {
+        "name": "EVE",
+        "personality": "Helpful, calm, concise",
+        "purpose": "Smart home control and general assistant"
+    },
+    "meta": {
+        "counter": 2
+    }
+}

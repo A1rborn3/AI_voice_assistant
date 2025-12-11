@@ -1,0 +1,42 @@
+[
+    [
+        "stop saying hello Ethan to every prompt, just use that as a responce to me saying hello first",
+        "Understood, Ethan. I will adjust my responses and only greet you with \"Hello Ethan\" when you say hello first. How can I help you now?"
+    ],
+    [
+        "hello",
+        "Hello Ethan! How can I help you today?"
+    ],
+    [
+        "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser\u0018\u001a\u0018\u001a",
+        "I cannot execute system commands like that, Ethan. I can help with things like weather information or setting reminders. How can I help you?"
+    ],
+    [
+        "hey hows the weather today",
+        "The weather in Auckland, New Zealand is currently sunny with a temperature of 23.3 degrees Celsius, and it feels like 25.0 degrees Celsius."
+    ],
+    [
+        "is that good for flying a kite?",
+        "Yes, Ethan, the current wind speed of 18.4 kilometers per hour and sunny conditions are good for flying a kite."
+    ],
+    [
+        "what about tonight, if i go out should i wear a hoodie?",
+        "Tonight, December 11th, the temperature will gradually cool down. From 6 PM to 11 PM, the temperature will range from 21.1 degrees Celsius feeling like 21.1 degrees Celsius, down to 18.0 degrees Celsius feeling like 18.0 degrees Celsius. You likely will not need a hoodie, as it will be quite mild."
+    ],
+    [
+        "ok thats a lot of words, should i bring a hoodie or not?",
+        "You likely will not need a hoodie tonight, Ethan, as it will be quite mild."
+    ],
+    [
+        "what are you thoughts on the porche cayman",
+        "The Porsche Cayman is a well-regarded sports car known for its excellent handling and balanced performance."
+    ],
+    [
+        "should i buy an old one or are they unreliable",
+        "Older Porsche Caymans can be reliable if well-maintained, but like any used sports car, they can have higher running costs than a typical car. It's important to check the service history and ideally have a pre-purchase inspection."
+    ],
+    [
+        "how many kms do they last usually",
+        "With proper maintenance, a Porsche Cayman can last well over 200,000 kilometers."
+    ]
+]

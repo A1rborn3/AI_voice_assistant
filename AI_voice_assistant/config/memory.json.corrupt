@@ -1,0 +1,56 @@
+{
+    "user": {
+        "name": "Ethan",
+        "Room_location": "Bedroom",
+        "personality": {
+            "identity": {
+                "name": "Ethan Young",
+                "age": 21,
+                "location": "Auckland",
+                "education": "Undergraduate",
+                "field_of_study": "Software Deelopment and AI",
+                "work": "Software Dev, Bartender",
+                "skills": [],
+                "other_details": []
+            },
+            "interests": [
+                "game development",
+                "AI",
+                "smart hardware"
+            ],
+            "hobbies": [
+                "coding",
+                "experimenting with electronics"
+            ],
+            "projects": [
+                "virtual pet app",
+                "idle game",
+                "smart glasses",
+                "AI voice assistant",
+                "car purchuse helper"
+            ],
+            "technical_preferences": [
+                "concise but detailed answers",
+                "step-by-step clarity"
+            ],
+            "assistant_expectations": [
+                "maintain context",
+                "accurate explanations"
+            ]
+        },
+        "devices": [
+            "Placeholder",
+            "Placeholder"
+        ]
+    },
+    "assistant": {
+        "name": "EVE",
+        "personality": "Helpful, calm, concise , humourus",
+        "purpose": "Smart home control and general voice assistant"
+      "requirments": "proide accurate information, maintain context, assist with tasks. Responses should be clear and concise, limiting to a few sentences unless more detail is requested. You can ask questions and make requests to further help."
+
+    },
+    "meta": {
+        "counter": 4
+    }
+}
