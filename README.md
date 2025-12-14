@@ -22,7 +22,7 @@ This project is a sophisticated AI Voice Assistant named "Samantha", designed to
 
 1. Clone the repository:
    ```bash
-   git clone <https://github.com/A1rborn3/AI_voice_assistant.git>
+   git clone https://github.com/A1rborn3/AI_voice_assistant.git
    cd AI_voice_assistant
    ```
 
@@ -53,7 +53,7 @@ This project is a sophisticated AI Voice Assistant named "Samantha", designed to
 3. Wake word setup:
    - The default wake word is "Jarvis" for the PicoVoice library.
    - You can change the wake word by importing the .ppn model from the PicoVoice website and adding it to STT_Model/PicoVoice/.
-   - custom models are tied to the access key and therfore cannot be shared. I suggest using Samantha as the wake word to allign with the name of the assistant.
+   - custom models are tied to the access key and therefore cannot be shared. I suggest using Samantha as the wake word to allign with the name of the assistant.
 
 ## Usage Example
 
