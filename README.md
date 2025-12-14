@@ -82,11 +82,11 @@ AI_voice_assistant/
 │   ├── STTModule.py           # Speech-to-Text logic
 │   ├── TTSModule.py           # Text-to-Speech logic
 │   ├── logging_config.py      # Logging setup
-│   ├── config/                # Configuration files
 │   └── voices/                # TTS Voice models
 ├── requirements.txt           # Python dependencies
-├── README.txt                 # Project documentation
-└──.env.example.txt            # Environment variables example
+├── README.md                 # Project documentation
+├── config/                    # Configuration files
+└──.env.example            # Environment variables example
 ```
 
 ## Future Improvements
