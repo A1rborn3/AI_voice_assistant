@@ -44,15 +44,40 @@ class Memory:
     def _load(self):   
         dataDefault = {
                 "user": {
-                    "name": "Ethan",
-                    "location": "Bedroom",
-                    "personality": "N/A",
-                    "devices": ["Samsung TV", "LED Strip"]
+                    "personality": {
+                        "identity": {
+                            "name": "",
+                            "prefered_name": "",
+                            "age": "",
+                            "location": "",
+                            "education": "",
+                            "field_of_study": "",
+                            "work": "",
+                            "skills": [],
+                            "other_details": []
+                        },
+                        "interests": [],
+                        "hobbies": [],
+                        "projects": [],
+                        "technical_preferences": [],
+                        "assistant_expectations": [
+                            "maintain context",
+                            "accurate explanations"
+                        ]
+                    },
+                    "devices": [
+                        "Placeholder",
+                        "Placeholder"
+                    ]
                 },
                 "assistant": {
                     "name": "Samantha",
-                    "personality": "Helpful, calm, concise",
-                    "purpose": "Smart home control and general assistant"
+                    "personality": "Helpful, calm, concise , humorous",
+                    "purpose": "Smart home control and general voice assistant",
+                    "requirements": "provide accurate information, maintain context, assist with tasks. Responses should be clear and concise, limiting to a few sentences unless more detail is requested. You can ask questions and make requests to further help."
+                },
+                "meta": {
+                    "counter": 0
                 }
             }
         try:
@@ -169,6 +194,7 @@ Output strictly as JSON in this structure:
 {{
   "identity": {{
     "name": "",
+    "prefered_name": "",
     "age": "",
     "location": "",
     "education": "",

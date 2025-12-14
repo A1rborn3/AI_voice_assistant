@@ -402,7 +402,14 @@ FodyWeavers.xsd
 
 # Custom User Ignores
 .env
-STT_Model/
+STT_Model/*
+!STT_Model/PicoVoice/*.ppn
+!STT_Model/PicoVoice/LICENSE.txt
+!STT_Model/.gitkeep
 AIAssistant312/
 
 #env
+
+# AI Voice Assistant Memory Files
+**/config/memory.json
+**/config/*.conversation.json

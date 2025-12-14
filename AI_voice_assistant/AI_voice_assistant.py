@@ -131,9 +131,14 @@ def process_interaction(input_text, memory, interaction_type):
     print(response)
     TTSModule.speak(response)
 
-    # Save conversation pair
-    # For alerts, we might want to format the input differently in memory, e.g. "System Alert: ..."
-    # But for now, sticking to the requested "same place" logic.
+    # Save conversation pair to memory (and file)
+    # We pass the original input and the assistant's response
+    # The 'response' might need cleaning if it's JSON, but get_recent_conversation 
+    # just stores strings, so this is fine.
+    if response:
+        memory.add_message_pair(input_text, response)
+        memory.save() # Explicitly save to disk after every interaction for safety
+
 if __name__ == "__main__":
     TTSModule.warmup()
 
