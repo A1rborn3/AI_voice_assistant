@@ -1,18 +1,42 @@
 [
     [
+        "do you remember apply conversation",
+        "Hello Ethan! I'm quite cheerful today. How can I assist you?"
+    ],
+    [
         "hello",
-        "Hello Ethan, how can I assist you today."
+        "Hello Ethan! How can I assist you today?"
     ],
     [
-        "hows the weather out today",
-        "The current temperature in Auckland is 24 point 2 degrees Celsius, it feels like 25 point 4 degrees, and it is sunny with a gentle breeze of 21 point 2 kilometers per hour."
+        "other",
+        "Hi Ethan! I'm quite cheerful today. How can I assist you?"
     ],
     [
-        "ive been having such a busy day today",
-        "I can imagine, Sundays can be pretty hectic, would you like me to set a reminder for something to help you unwind later, or perhaps get the weather forecast to plan out the rest of your day."
+        "hello",
+        "Hello Ethan! How can I assist you today?"
     ],
     [
-        "no thank you thats alright just wanted to complain",
-        "Sometimes it's nice to just vent about a busy day, if you're sure you don't need anything, I'm here to listen if you'd like to talk more about what's been going on."
+        "hello",
+        "Hello Ethan! How can I assist you today?"
+    ],
+    [
+        "hello",
+        "Hello Ethan! How can I assist you today?"
+    ],
+    [
+        "hello",
+        "Hello Ethan! How can I assist you today?"
+    ],
+    [
+        "hello",
+        "Hello Ethan! How can I assist you today?"
+    ],
+    [
+        "like eight years now",
+        "Hello Ethan! Eight years is quite the span. What would you like to reminisce about or remember?"
+    ],
+    [
+        "police if conversation",
+        "Hello Ethan! How can I assist you today?"
     ]
 ]

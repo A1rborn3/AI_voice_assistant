@@ -96,18 +96,27 @@ class STFTModule:
                 print("Error: Porcupine could not be initialized.")
                 return False
             
-            # Use Index 0 (HyperX) as per user request
-            self.recorder = PvRecorder(device_index=0, frame_length=self.porcupine.frame_length)
+            # Use Index -1 to select the default OS microphone, instead of hardcoding to 0
+            self.recorder = PvRecorder(device_index=-1, frame_length=self.porcupine.frame_length)
 
             self.recorder.start()
             
-            logger.info("Listening for wake word on device index 0...")
+            logger.info("Listening for wake word on default device...")
+            
+            # Lazy import to prevent circular dependency
+            import TTSModule
             
             while True:
                 pcm = self.recorder.read()
                 result = self.porcupine.process(pcm)
                 if result >= 0:
                     logger.info("Wake word detected!")
+                    
+                    # Interruption logic: If the AI is currently talking, stop it immediately!
+                    if TTSModule.is_speaking.is_set():
+                        logger.info("Interrupting TTS playback...")
+                        TTSModule.cut_off()
+                        
                     return True
                     
         except Exception as e:
@@ -132,11 +141,11 @@ class STFTModule:
             # Vosk requires 16k samplerate usually
             rec = KaldiRecognizer(self.vosk_model, 16000)
             
-            # Use PvRecorder for capturing audio. Using device 0 as verified.
-            recorder = PvRecorder(device_index=0, frame_length=512)
+            # Use PvRecorder for capturing audio. Using default device (-1).
+            recorder = PvRecorder(device_index=-1, frame_length=512)
             recorder.start()
             
-            logger.info("Listening for command on device index 0...")
+            logger.info("Listening for command on default device...")
             print("Listening...")
             
             full_text = ""

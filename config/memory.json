@@ -2,43 +2,7 @@
     "user": {
         "name": "Ethan",
         "location": "Bedroom",
-        "personality": {
-            "identity": {
-                "name": "Ethan Young",
-                "prefered_name": "Ethan",
-                "age": 21,
-                "location": "Auckland",
-                "education": "Undergraduate",
-                "field_of_study": "Software Development and AI",
-                "work": "Software Dev, Bartender",
-                "skills": [],
-                "other_details": []
-            },
-            "interests": [
-                "game development",
-                "AI",
-                "smart hardware"
-            ],
-            "hobbies": [
-                "coding",
-                "experimenting with electronics"
-            ],
-            "projects": [
-                "virtual pet app",
-                "idle game",
-                "smart glasses",
-                "AI voice assistant",
-                "car purchase helper"
-            ],
-            "technical_preferences": [
-                "concise but detailed answers",
-                "step-by-step clarity"
-            ],
-            "assistant_expectations": [
-                "maintain context",
-                "accurate explanations"
-            ]
-        },
+        "personality": "{\n  \"identity\": {\n    \"name\": \"Ethan Young\",\n    \"prefered_name\": \"\",\n    \"age\": 21,\n    \"location\": \"Auckland, New Zealand\",\n    \"education\": \"Undergraduate\",\n    \"field_of_study\": \"Software Development and AI\",\n    \"work\": \"Software Dev, Bartender\",\n    \"skills\": [\"programming\", \"software development\", \"AI\"],\n    \"other_details\": []\n  },\n  \"interests\": [],\n  \"hobbies\": [\n    {\n      \"name\": \"Programming and Software Development\"\n    }\n  ],\n  \"projects\": [\n    {\n      \"name\": \"AIME Project\",\n      \"description\": \"An AI project that predicts the outcome of a game through AI and machine learning\"\n    },\n    {\n      \"name\": \"Personal Website for Ethan Young\",\n      \"description\": \"Self-hosted website showcasing my projects and personal interests\"\n    }\n  ],\n  \"technical_preferences\": [\"programming\", \"software development\", \"AI\"],\n  \"assistant_expectations\": []\n}",
         "devices": [
             "Placeholder",
             "Placeholder"
@@ -51,6 +15,6 @@
         "requirements": "provide accurate information, maintain context, assist with tasks. Responses should be clear and concise, limiting to a few sentences unless more detail is requested. You can ask questions and make requests to further help."
     },
     "meta": {
-        "counter": 8
+        "counter": 0
     }
 }

@@ -7,7 +7,6 @@ import sys
 from datetime import datetime
 import TTSModule
 
-#print(LLMClient.askLLM("What is the most common car in NZ"))
 
 # Initialize logging early
 logging_config.setup_logging()
@@ -47,97 +46,94 @@ def process_interaction(input_text, memory, interaction_type):
     now = datetime.now()
     
     if interaction_type == "reminder":
-        context = f"""
-        Samantha Assistant:
+        user_prompt = f"""[INSTRUCTIONS]
+You are Samantha.
+Current date and time: {now.strftime("%Y-%m-%d %H:%M")}
+User profile:
+{memory.get_user_profile()}
+Assistant profile:
+{memory.get_assistant_profile()}
+Recent conversation:
+{memory.get_recent_conversation()}
 
-        Current date and time: {now.strftime("%Y-%m-%d %H:%M")}
-
-        User profile:
-        {memory.get_user_profile()}
-
-        Assistant profile:
-        {memory.get_assistant_profile()}
-
-        Recent conversation:
-        {memory.get_recent_conversation()}
-
-        Reminder Context:
-        {input_text}
-
-        Instruction:
-        a set reminder has gone off. Generate a response or take action based on the Reminder Context and the provided memory to alert the user.
-        """
+[TASK]
+A set reminder has gone off. Context: {input_text}
+Generate a response or take action to alert the user naturally."""
+        
+        context = [{"role": "user", "content": user_prompt}]
+        
     elif interaction_type == "conversation":
-        context = f"""
-        Samantha Assistant:
+        system_prompt = f"""You are Samantha, a witty, charming, and highly capable personal AI assistant. 
+You possess a distinct personality: helpful, calm, concise, and humorous. You love chatting naturally and always stay in character.
 
-        Current date and time: {now.strftime("%Y-%m-%d %H:%M")}
-        Day of week: {now.strftime("%A")}
+Current context:
+Date/Time: {now.strftime("%Y-%m-%d %H:%M")}
+Day: {now.strftime("%A")}
 
-        User profile:
-        {memory.get_user_profile()}
+User profile:
+{memory.get_user_profile()}
+Assistant profile:
+{memory.get_assistant_profile()}
 
-        Assistant profile:
-        {memory.get_assistant_profile()}
+Recent conversation:
+{memory.get_recent_conversation()}
 
-        Recent conversation:
-        {memory.get_recent_conversation()}
+[CONSTRAINTS]
+1. All responses must be formatted for Text-to-Speech output.
+2. Output a single line of plain text. Use natural pauses with commas or periods.
+3. Never use emojis, symbols, markdown, or numbered lists.
+4. Keep the output concise but natural for speech.
 
-        Constraints:
-        All responses must be formatted for TTS output:
-        - Output a single line of plain text.
-        - Use only normal ASCII characters.
-        - Avoid emojis, symbols, and markdown.
-        - Use clear grammar and natural pauses with commas or periods.
-        - Do not create lists or numbered items.
-        - Do not include newlines.
-        - Keep output concise but natural for speech.
-
-
-        The user says:
-        {input_text}
-        """
+CRITICAL TOOL RULE:
+If you need to check the weather or set a reminder, use the provided tools. If you ask the user a question, simply end your sentence with a question mark '?'.
+"""
+        
+        context = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": input_text}
+        ]
+        
     else:#default to conversation
-        context = f"""
-        Samantha Assistant:
+        system_prompt = f"""You are Samantha, a witty, charming, and highly capable personal AI assistant. 
+You possess a distinct personality: helpful, calm, concise, and humorous. You love chatting naturally and always stay in character.
 
-        Current date and time: {now.strftime("%Y-%m-%d %H:%M")}
-        Day of week: {now.strftime("%A")}
+Current context:
+Date/Time: {now.strftime("%Y-%m-%d %H:%M")}
+Day: {now.strftime("%A")}
 
-        User profile:
-        {memory.get_user_profile()}
+User profile:
+{memory.get_user_profile()}
+Assistant profile:
+{memory.get_assistant_profile()}
 
-        Assistant profile:
-        {memory.get_assistant_profile()}
+Recent conversation:
+{memory.get_recent_conversation()}
 
-        Recent conversation:
-        {memory.get_recent_conversation()}
+[CONSTRAINTS]
+1. All responses must be formatted for Text-to-Speech output.
+2. Output a single line of plain text. Use natural pauses with commas or periods.
+3. Never use emojis, symbols, markdown, or numbered lists.
+4. Keep the output concise but natural for speech.
 
-        Constraints:
-        All responses must be formatted for TTS output:
-        - Output a single line of plain text.
-        - Use only normal ASCII characters.
-        - Avoid emojis, symbols, and markdown.
-        - Use clear grammar and natural pauses with commas or periods.
-        - Do not create lists or numbered items.
-        - Do not include newlines.
-        - Keep output concise but natural for speech.
+CRITICAL TOOL RULE:
+If you need to check the weather or set a reminder, use the provided tools. If you ask the user a question, simply end your sentence with a question mark '?'.
+"""
 
-        The user says:
-        {input_text}
-        """
+        context = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": input_text}
+        ]
 
     response = ask_llm_threaded(context)
     print(response)
     TTSModule.speak(response)
 
     # Save conversation pair to memory (and file)
-    # We pass the original input and the assistant's response
-    # The 'response' might need cleaning if it's JSON, but get_recent_conversation 
-    # just stores strings, so this is fine.
     if response:
         memory.add_message_pair(input_text, response)
-        memory.save() # Explicitly save to disk after every interaction for safety
+        memory.save()
+        
+    return response
 
 if __name__ == "__main__":
     TTSModule.warmup()
@@ -155,19 +151,39 @@ if __name__ == "__main__":
     
     elif mode == "2":
         import STTModule
+        import LLMClient
         stt = STTModule.STFTModule() # Initialize
         
         while True:
             print("Waiting for wake word...")
             if stt.listen_for_wake_word():
-                print("Listening for command...")
-                text = stt.listen_for_command()
-                if text:
-                    print(f"You said: {text}")
-                    if "exit" in text.lower():
-                        break
-                    process_interaction(text, memory, "conversation")
-                else:
-                    print("Could not understand command.")
-    
+                
+                while True: # Inner loop for continuous conversation
+                    print("Listening for command...")
+                    text = stt.listen_for_command()
+                    if text:
+                        print(f"You said: {text}")
+                        if "exit" in text.lower():
+                            break
+                        
+                        # Process interaction and get the AI's spoken text back
+                        response_text = process_interaction(text, memory, "conversation")
+                        
+                        # Fallback for small models: If the AI asked a question, keep the mic open!
+                        if response_text and "?" in response_text:
+                            # Wait until TTS is finished speaking to avoid microphone feedback
+                            while TTSModule.is_speaking.is_set():
+                                time.sleep(0.1)
+                                
+                            print("Continuing conversation (AI asked a question)...")
+                            continue # Skip wake word, listen for command again
+                        else:
+                            # Wait until TTS is finished before returning to wake word detection
+                            while TTSModule.is_speaking.is_set():
+                                time.sleep(0.1)
+                            break # Go back to waiting for wake word
+                    else:
+                        print("Could not understand command.")
+                        break # Go back to waiting for wake word
+
     memory.save()
