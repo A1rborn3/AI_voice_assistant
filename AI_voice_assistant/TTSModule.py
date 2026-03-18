@@ -60,7 +60,7 @@ class TextToSpeech:
 
             for chunk in self.voice.synthesize(text):
                 # Check for cutoff request mid-synthesis
-                if not is_speaking.is_set() and stream is not None:
+                if not is_speaking.is_set():
                     # 'cut_off' sets is_speaking to False.
                     # We should safely abort generating more audio.
                     break
@@ -74,7 +74,6 @@ class TextToSpeech:
                         # sounddevice plays nice with threads usually.
                         stream = sd.OutputStream(samplerate=rate, channels=1, dtype='int16')
                         stream.start()
-                        is_speaking.set()
                     
                     stream.write(chunk.audio_int16_array)
 
@@ -121,6 +120,9 @@ def speak(text):
         if _tts_instance is None:
             _tts_instance = TextToSpeech()
         
+        # Set here to avoid race condition where main thread checks is_speaking before daemon thread sets it
+        is_speaking.set()
+        
         # Use unique filename to avoid conflicts if called rapidly
         filename = f"tts_{uuid.uuid4().hex}.wav"
         
@@ -130,6 +132,7 @@ def speak(text):
         
     except Exception as e:
         logger.error(f"Failed to initialize or speak: {e}")
+        is_speaking.clear()
 
 def warmup():
     """Initialize the TTS model immediately."""

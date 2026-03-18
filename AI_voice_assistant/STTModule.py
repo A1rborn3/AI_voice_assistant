@@ -2,6 +2,7 @@
 import os
 import pvporcupine
 import json
+import time
 from pvrecorder import PvRecorder
 from vosk import Model, KaldiRecognizer
 import logging
@@ -86,8 +87,8 @@ class STFTModule:
         
         return porcupine
 
-    def listen_for_wake_word(self):
-        """Blocks until wake word is detected."""
+    def listen_for_wake_word(self, until_event_cleared=None):
+        """Blocks until wake word is detected or until_event_cleared is no longer set."""
         try:
             if self.porcupine is None:
                 self.porcupine = self._init_porcupine()
@@ -107,6 +108,11 @@ class STFTModule:
             import TTSModule
             
             while True:
+                # If an event was provided and it's no longer set, exit without detecting
+                if until_event_cleared is not None and not until_event_cleared.is_set():
+                    logger.info("Wake word listening cancelled (event cleared).")
+                    return False
+                    
                 pcm = self.recorder.read()
                 result = self.porcupine.process(pcm)
                 if result >= 0:
@@ -138,21 +144,43 @@ class STFTModule:
         # Vosk is flexible.
         
         try:
-            # Vosk requires 16k samplerate usually
+            # Vosk requires 16k samplerate normally
             rec = KaldiRecognizer(self.vosk_model, 16000)
             
-            # Use PvRecorder for capturing audio. Using default device (-1).
+            # Use PvRecorder for capturing audio. Default device (-1).
             recorder = PvRecorder(device_index=-1, frame_length=512)
             recorder.start()
             
-            logger.info("Listening for command on default device...")
+            logger.info("Listening for command...")
             print("Listening...")
             
             full_text = ""
-            silence_frames = 0
-            MAX_SILENCE = 30 # approx 1-2 seconds depending on frame rate reading
+            # Small delay to let the audio system stabilize/clear buffers
+            time.sleep(0.5)
+            
+            start_time = time.perf_counter()
+            INITIAL_TIMEOUT = 7.0 
+            TOTAL_TIMEOUT = 10.0
+            has_started_speaking = False
             
             while True:
+                elapsed = time.perf_counter() - start_time
+                if int(elapsed * 2) % 10 == 0: # Simple way to print roughly every 1s
+                     logger.debug(f"STT: Elapsed {elapsed:.1f}s, speaking={has_started_speaking}")
+
+                # Check for initial silence timeout
+                if not has_started_speaking and elapsed > INITIAL_TIMEOUT:
+                    logger.info(f"STT: No speech detected in initial {INITIAL_TIMEOUT}s window. Elapsed: {elapsed:.2f}s")
+                    print(f"No command heard, timed out after {elapsed:.1f}s.")
+                    break
+                
+                # Check for total command timeout
+                if elapsed > TOTAL_TIMEOUT:
+                    logger.info(f"STT: Max {TOTAL_TIMEOUT}s limit reached. Disregarding.")
+                    full_text = "" 
+                    print(f"Command too long (noise?), timed out after {elapsed:.1f}s.")
+                    break
+
                 pcm = recorder.read()
                 # PvRecorder gives list of ints, need bytes for Vosk
                 import struct
@@ -162,17 +190,17 @@ class STFTModule:
                     res = json.loads(rec.Result())
                     text = res.get('text', '')
                     if text:
+                        has_started_speaking = True
                         full_text += " " + text
                         print(f"Recognized: {text}")
-                        # Simple break condition: if we got text, we are done? 
-                        # Or wait for silence? 
-                        # For a simple assistant, usually single-shot is fine.
+                        # For a single-shot command after wake word, we break here.
                         break 
                 else:
-                    # Partial result
-                    # res = json.loads(rec.PartialResult())
-                    pass
-                    
+                    # Check partial result to see if speech has started
+                    partial = json.loads(rec.PartialResult())
+                    if partial.get('partial', '').strip():
+                        has_started_speaking = True
+                        
             recorder.stop()
             recorder.delete()
             return full_text.strip()

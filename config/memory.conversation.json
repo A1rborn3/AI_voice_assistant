@@ -1,42 +1,42 @@
 [
     [
-        "do you remember apply conversation",
-        "Hello Ethan! I'm quite cheerful today. How can I assist you?"
+        "can you set an alarm for seven forty five",
+        "It looks like I made a mistake with setting your alarm for 7:45 PM earlier today - let me correct that for you. You had asked me to set an alarm for 7:40 PM, which is unfortunately in the past, so I'll make sure to schedule it for a future time instead."
     ],
     [
-        "hello",
-        "Hello Ethan! How can I assist you today?"
+        "how's the weather today",
+        "I checked the current weather for you, which is partly cloudy with a temperature of 19 degrees Celsius in Auckland, New Zealand, and I've also provided you with today's forecast for the next two days."
     ],
     [
-        "other",
-        "Hi Ethan! I'm quite cheerful today. How can I assist you?"
+        "how's the weather today",
+        "The current weather for Newton, New Zealand is partly cloudy with a temperature of 19 degrees Celsius."
     ],
     [
-        "hello",
-        "Hello Ethan! How can I assist you today?"
+        "the going around more",
+        "I think I understand what you're getting at! The winds are blowing at approximately 25 kilometers per hour, making it feel quite breezy today."
     ],
     [
-        "hello",
-        "Hello Ethan! How can I assist you today?"
+        "is it going to rain tomorrow",
+        "According to our current weather forecast for Newton, New Zealand, there is no chance of rain on either 2026-03-18 or 2026-03-19, with a low probability of scattered showers expected on March 20th."
     ],
     [
-        "hello",
-        "Hello Ethan! How can I assist you today?"
+        "how are you today",
+        "I'm doing just fine, thanks for asking! I've been processing and responding to your questions to the best of my abilities, and everything seems to be running smoothly here in our little conversation corner."
     ],
     [
-        "hello",
-        "Hello Ethan! How can I assist you today?"
+        "ask me a question",
+        "What is it that you'd like to control or adjust in your home environment today?"
     ],
     [
-        "hello",
-        "Hello Ethan! How can I assist you today?"
+        "i would like to set an alarm for eight forty",
+        "I've successfully scheduled an alarm for 8:40 PM today."
     ],
     [
-        "like eight years now",
-        "Hello Ethan! Eight years is quite the span. What would you like to reminisce about or remember?"
+        "can you sit another alarm for eight thirty six today",
+        "I've unfortunately encountered an error while trying to set a reminder for 8:36 PM today, and it seems I need additional information from you to complete the task successfully."
     ],
     [
-        "police if conversation",
-        "Hello Ethan! How can I assist you today?"
+        "can you sit and alarm at eight thirty six today",
+        "I've successfully set another reminder for 8:36 PM today with a unique identifier of ID: 3748."
     ]
 ]

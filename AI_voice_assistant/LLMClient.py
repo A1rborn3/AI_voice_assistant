@@ -1,36 +1,36 @@
-
 import os
 import json
 import logging
+import re
 import APIManagerMain
 
-# Import OpenAI from the library for local models
 try:
     from openai import OpenAI
 except ImportError:
     OpenAI = None
 
-# Import dotenv to load environment variables
 try:
     from dotenv import load_dotenv
-    # Load .env file from the current directory or parent
-    # Explicitly looking in the current folder just in case
     env_path = os.path.join(os.path.dirname(__file__), '.env')
     load_dotenv(env_path)
 except ImportError:
-    pass # dotenv might not be installed, we assume vars are set otherwise
+    pass
 
-# Set up logger
 logger = logging.getLogger(__name__)
 
-# Flag to keep microphone open without wake word
-EXPECTS_RESPONSE = False
+# LLM_BASE_URL: address of your llama.cpp / LM Studio server (set in .env)
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
+LLM_MODEL    = os.getenv("LLM_MODEL", "llama-3.2-3b-instruct")
 
-# Initialize local OpenAI client
+# Temperature controls how creative/varied the spoken responses are.
+# 0.0 = fully deterministic (used internally for routing/JSON extraction)
+# 0.7 = balanced, natural-sounding speech (good default for conversation)
+# 1.0+ = very creative but less predictable
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
+
 if OpenAI:
     try:
-        # Initializing for a local instance. It does not require a real API key.
-        client = OpenAI(base_url="http://localhost:1234/v1", api_key="local-placeholder")
+        client = OpenAI(base_url=LLM_BASE_URL, api_key="local-placeholder")
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI client: {e}")
         client = None
@@ -38,153 +38,239 @@ else:
     logger.error("OpenAI library not installed.")
     client = None
 
-# Tool Definitions (OpenAI Format)
-tools = [
-     {
-        "type": "function",
-        "function": {
-            "name": "get_weather_data",
-            "description": "Get the weather data for the current location.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "forecast": {
-                        "type": "boolean",
-                        "description": "True to get 3-day forecast, False for today only."
-                    }
-                },
-                "required": ["forecast"]
-            }
-        }
+# ─── Tool Registry ────────────────────────────────────────────────────────────
+# This is the canonical list of tools available in the system.
+# Each entry maps a display name (for the router) to a callable and its schema.
+TOOLS = {
+    "create_reminder": {
+        "description": "Set a reminder or alarm for the user at a specific date and time.",
+        "schema": {
+            "day":     {"type": "integer", "description": "Day of the month"},
+            "month":   {"type": "integer", "description": "Month (1-12)"},
+            "year":    {"type": "integer", "description": "4-digit year"},
+            "hour":    {"type": "integer", "description": "Hour in 24-hour format"},
+            "minute":  {"type": "integer", "description": "Minute (0-59)"},
+            "context": {"type": "string",  "description": "What the reminder is for"}
+        },
+        "required": ["day", "month", "year", "hour", "minute", "context"],
+        "callable": APIManagerMain.create_reminder,
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_reminder",
-            "description": "Set a reminder for the user.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "day": {"type": "integer"},
-                    "month": {"type": "integer"},
-                    "year": {"type": "integer"},
-                    "hour": {"type": "integer"},
-                    "minute": {"type": "integer"},
-                    "context": {"type": "string"}
-                },
-                "required": ["day", "month", "year", "hour", "minute", "context"]
-            }
-        }
+    "list_reminders": {
+        "description": "List all active reminders and alarms.",
+        "schema": {},
+        "required": [],
+        "callable": APIManagerMain.list_reminders,
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "continue_conversation",
-            "description": "Call this function to keep the microphone open without waiting for the wake word again. Use this when you ask the user a question or expect them to respond or ask a follow up question.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    }
-]
+    "delete_reminder": {
+        "description": "Delete an active reminder or alarm using its ID.",
+        "schema": {
+            "reminder_id": {"type": "string", "description": "The ID of the reminder to delete"}
+        },
+        "required": ["reminder_id"],
+        "callable": APIManagerMain.delete_reminder,
+    },
+    "get_weather_data": {
+        "description": "Get current weather or a 3-day forecast for the user's location.",
+        "schema": {
+            "forecast": {"type": "boolean", "description": "True for 3-day forecast, False for today only"}
+        },
+        "required": ["forecast"],
+        "callable": APIManagerMain.get_weather_data,
+    },
+    "end_conversation": {
+        "description": "End the conversation if the user indicates they are finished or wants to say goodbye.",
+        "schema": {},
+        "required": [],
+        "callable": APIManagerMain.end_conversation,
+    },
+}
 
-def handle_tool_calls(tool_calls, messages, response_message, model):
-    """
-    Execute tool calls and send results back to the LLM.
-    """
-    # Append the assistant's message with tool calls to history
-    # Converting message to dict to be safe for appending
-    messages.append(response_message)
 
-    for tool_call in tool_calls:
-        function_name = tool_call.function.name
-        
-        # Parse arguments
-        try:
-            function_args = json.loads(tool_call.function.arguments)
-        except json.JSONDecodeError:
-            function_args = {}
-
-        logger.info(f"Calling tool: {function_name} with args: {function_args}")
-        print(f"DEBUG: Executing tool {function_name}")
-        
-        tool_response = None
-        
-        try:
-            if function_name == "get_weather_data":
-                tool_response = APIManagerMain.get_weather_data(**function_args)
-            elif function_name == "create_reminder":
-                tool_response = APIManagerMain.create_reminder(**function_args)
-            elif function_name == "continue_conversation":
-                global EXPECTS_RESPONSE
-                EXPECTS_RESPONSE = True
-                tool_response = "Success. The microphone will remain open for the user to reply immediately."
-            else:
-                tool_response = "Error: Unknown function."
-        except Exception as e:
-            tool_response = f"Error executing tool: {e}"
-        
-        # Append the tool result to history
-        messages.append({
-            "tool_call_id": tool_call.id,
-            "role": "tool",
-            "name": function_name,
-            "content": str(tool_response)
-        })
-
-    # Second turn: Get the final answer from the LLM
-    try:
-        second_response = client.chat.completions.create(
-            model=model,
-            messages=messages
-        )
-        return second_response.choices[0].message.content
-    except Exception as e:
-        logger.error(f"LLM Follow-up Error: {e}")
-        return "I completed the action but failed to generate a final response."
-
-#for easy copy paste
-#alt model 1:qwen2.5-1.5b-instruct-q4_k_m
-#alt model 2:Qwen3.5 0.8B
-
-def askLLM(prompt, model="Qwen3.5 0.8B"):
-    """
-    Query Local LLM.
-    """
+def _chat(messages: list, max_tokens: int = 256, temperature: float = 0.1) -> str:
+    """Low-level helper: send messages to LLM and return content string."""
     if not client:
-        return "Local client not initialized. Is the openai library installed?"
+        return "[Error: LLM client not initialized]"
+    try:
+        resp = client.chat.completions.create(
+            model=LLM_MODEL,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error(f"LLM API error: {e}")
+        return f"[Error calling LLM: {e}]"
+
+
+# ─── Stage 1: Router ──────────────────────────────────────────────────────────
+def route_intent(user_text: str) -> str:
+    """
+    Classify the user's intent as TOOL or CHAT.
+    Returns 'TOOL' or 'CHAT'.
+    """
+    # Build a concise tool summary for the router so it knows what's available
+    tool_summary = "\n".join(
+        f"- {name}: {info['description']}"
+        for name, info in TOOLS.items()
+    )
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are an intent classifier. Your only job is to decide if the user's message "
+                "requires calling a backend tool, or if it is just normal conversation.\n\n"
+                "Available tools:\n"
+                f"{tool_summary}\n\n"
+                "Examples:\n"
+                "- \"set an alarm for 7am\": TOOL\n"
+                "- \"what's the weather?\": TOOL\n"
+                "- \"that's all, thanks\": TOOL\n"
+                "- \"goodbye\": TOOL\n"
+                "- \"how are you?\": CHAT\n"
+                "- \"tell me a joke\": CHAT\n\n"
+                "If the user's message matches the PURPOSE of any tool above, respond with exactly: TOOL\n"
+                "Otherwise respond with exactly: CHAT\n"
+                "Output only one word. No explanation."
+            )
+        },
+        {"role": "user", "content": user_text}
+    ]
+
+    result = _chat(messages, max_tokens=10, temperature=0.0)
+    # Normalize – capture the full output to match against tool names
+    result_clean = result.strip().upper()
     
-    # Simple history management: just the prompt if string, or passed list
-    messages = []
-    if isinstance(prompt, str):
-        # Fallback if a raw string is passed
-        messages = [{"role": "user", "content": prompt}]
-    elif isinstance(prompt, list):
-        messages = prompt
-    else:
-        messages = [{"role": "user", "content": str(prompt)}]
+    # Check if the model said "TOOL" OR mentioned any of our tool names specifically
+    tool_names = [name.upper() for name in TOOLS.keys()]
+    is_tool_by_llm = "TOOL" in result_clean or any(name in result_clean for name in tool_names)
+    
+    # MANUAL KEYWORD OVERRIDE: If STT hears these words, force TOOL path
+    # This fixes issues where STT typos like "sit and alarm" confuse the router.
+    trigger_words = ["alarm", "reminder", "weather", "forecast"]
+    is_tool_by_keyword = any(word in user_text.lower() for word in trigger_words)
+    
+    intent = "TOOL" if (is_tool_by_llm or is_tool_by_keyword) else "CHAT"
+    
+    # Print to console for user visibility
+    print(f"[Router] {intent} (LLM said: '{result.strip()}', Keyword Match: {is_tool_by_keyword})")
+    return intent
+
+
+# ─── Stage 2a: Tool Executor ──────────────────────────────────────────────────
+def execute_tool(user_text: str, now_str: str) -> str:
+    """
+    Ask the LLM to select & parameterize the correct tool, then execute it.
+    Returns a plain-text result string (tool output).
+    """
+    # Build a concise schema block for each tool
+    schema_blocks = []
+    for name, info in TOOLS.items():
+        params = ", ".join(
+            f"{k} ({v['type']}): {v['description']}"
+            for k, v in info["schema"].items()
+        ) if info["schema"] else "(no parameters required)"
+        schema_blocks.append(f"Tool: {name}\n  Description: {info['description']}\n  Parameters: {params}")
+
+    tool_docs = "\n\n".join(schema_blocks)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a tool selector and parameter extractor. "
+                "Given the user's request, select the most appropriate tool and output "
+                "ONLY a single-line JSON object with this structure:\n"
+                '{"tool": "<tool_name>", "args": {<parameter key-value pairs>}}\n\n'
+                "Rules:\n"
+                "- Output ONLY the raw JSON. No explanation, no extra text.\n"
+                "- Use 24-hour time for hours (e.g., 7:30 PM is hour: 19, minute: 30).\n"
+                "- Match the date to the current date provided below unless specified otherwise.\n"
+                "- If a tool takes no parameters, use: {\"tool\": \"<name>\", \"args\": {}}\n"
+                f"- Current date/time: {now_str}\n\n"
+                "Available tools:\n"
+                f"{tool_docs}"
+            )
+        },
+        {"role": "user", "content": user_text}
+    ]
+
+    raw = _chat(messages, max_tokens=120, temperature=0.0)
+    logger.info(f"[Tool Executor] LLM raw output: {raw}")
+
+    # Extract JSON from the response (handles markdown code blocks too)
+    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if not json_match:
+        return f"[Error: could not parse tool JSON from: {raw}]"
 
     try:
-        completion = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=tools,
-            tool_choice="auto",
-            max_tokens=1024
-        )
+        parsed = json.loads(json_match.group())
+        tool_name = parsed.get("tool", "")
+        args = parsed.get("args", {})
+    except json.JSONDecodeError as e:
+        return f"[Error: JSON decode failed: {e} | Raw: {raw}]"
 
-        response_message = completion.choices[0].message
-        
-        # Check for tool calls
-        if response_message.tool_calls:
-            return handle_tool_calls(response_message.tool_calls, messages, response_message, model)
-        
-        return response_message.content
+    if tool_name not in TOOLS:
+        return f"[Error: unknown tool '{tool_name}']"
 
+    # Execute the tool
+    try:
+        print(f"\n[EXEC] Running tool: {tool_name} with {args}")
+        func = TOOLS[tool_name]["callable"]
+        if args:
+            result = func(**args)
+        else:
+            result = func()
+        logger.info(f"[Tool Executor] Result: {result}")
+        return str(result)
     except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Local API Error: {error_msg}")
-        return f"I encountered an error with the local model: {error_msg}"
+        return f"[Error executing tool '{tool_name}': {e}]"
 
+
+# ─── Stage 2b: Conversational Response ───────────────────────────────────────
+def ask_conversational(user_text: str, context_messages: list, now_str: str,
+                       user_personality: str = "", assistant_context: str = "Samantha") -> str:
+    """
+    Generate a spoken, personality-rich conversational reply using Samantha's persona.
+    `context_messages` is the list of prior {role, content} dicts (conversation history).
+    """
+    system_prompt = (
+        "You are Samantha, a witty, charming, and highly capable personal AI assistant.\n"
+        "You possess a distinct personality: helpful, calm, concise, and humorous. "
+        "You love chatting naturally and always stay in character.\n\n"
+        "Rules:\n"
+        "1. Output a SINGLE line of plain text formatted for Text-to-Speech.\n"
+        "2. Use natural pauses with commas or periods for TTS readability.\n"
+        "3. Never use emojis, markdown, numbered lists, or symbols.\n"
+        "4. Always use the metric system (Celsius, kilometres).\n"
+        "5. Treat every user request as a fresh opportunity to be helpful. Even if a user repeats a question, answer it fully and politely as if it's the first time.\n"
+        "6. CRITICAL: Never say 'I already told you', 'as I mentioned before', 'like I said', or anything dismissive. Do not lecture the user on what you have previously discussed.\n"
+        f"\nCurrent date/time: {now_str}\n"
+        f"Assistant persona: {assistant_context}\n"
+        f"User context: {user_personality}"
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(context_messages)
+    messages.append({"role": "user", "content": user_text})
+
+    return _chat(messages, max_tokens=150, temperature=LLM_TEMPERATURE)
+
+
+# ─── Tool Result → Conversational Confirmation ────────────────────────────────
+def confirm_tool_result(tool_result: str, original_request: str, context_messages: list,
+                        now_str: str, user_personality: str = "",
+                        assistant_context: str = "Samantha") -> str:
+    """
+    Take a tool execution result and generate a friendly spoken confirmation using the Samantha persona.
+    """
+    synthesis_text = (
+        f"You just performed an action for the user. Here is the result:\n"
+        f"\"{tool_result}\"\n\n"
+        f"The user originally said: \"{original_request}\"\n\n"
+        "Confirm that you just completed the action in one natural, friendly, spoken sentence. "
+        "Do not list previous actions or recap the conversation history. Just confirm this specific result."
+    )
+
+    return ask_conversational(synthesis_text, context_messages, now_str, user_personality, assistant_context)

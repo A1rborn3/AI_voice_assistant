@@ -227,7 +227,7 @@ Existing profile:
         try:
             # lazy import to reduce circular import risk
             import LLMClient
-            updated = LLMClient.askLLM(prompt)
+            updated = LLMClient.askLLM(prompt, use_tools=False)
             if isinstance(updated, str):
                 updated = updated.strip()
             if updated:
