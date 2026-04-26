@@ -143,6 +143,7 @@ if __name__ == "__main__":
     TTSModule.warmup()
 
     print("1. Text Mode")
+
     print("2. Voice Mode")
     mode = input("Select mode (1/2): ")
     
