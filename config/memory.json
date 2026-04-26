@@ -2,7 +2,7 @@
     "user": {
         "name": "Ethan",
         "location": "Bedroom",
-        "personality": "{\n  \"identity\": {\n    \"name\": \"Ethan Young\",\n    \"prefered_name\": \"Ethan\",\n    \"age\": 21,\n    \"location\": \"Auckland\",\n    \"education\": \"Undergraduate\",\n    \"field_of_study\": \"Software Development and AI\",\n    \"work\": \"Software Dev, Bartender\",\n    \"skills\": [],\n    \"other_details\": []\n  },\n  \"interests\": [\n    \"game development\",\n    \"AI\",\n    \"smart hardware\"\n  ],\n  \"hobbies\": [\n    \"coding\",\n    \"experimenting with electronics\"\n  ],\n  \"projects\": [\n    \"virtual pet app\",\n    \"idle game\",\n    \"smart glasses\",\n    \"AI voice assistant\",\n    \"car purchase helper\"\n  ],\n  \"technical_preferences\": [\n    \"concise but detailed answers\",\n    \"step-by-step clarity\"\n  ],\n  \"assistant_expectations\": [\n    \"maintain context\",\n    \"accurate explanations\"\n  ]\n}",
+        "personality": "{\n  \"identity\": {\n    \"name\": \"\",\n    \"prefered_name\": \"\",\n    \"age\": \"\",\n    \"location\": \"\",\n    \"education\": \"\",\n    \"field_of_study\": \"\",\n    \"work\": \"\",\n    \"skills\": [],\n    \"other_details\": []\n  },\n  \"interests\": [\n    \"weather\",\n    \"alarms\"\n  ],\n  \"hobbies\": [\n    \n  ],\n  \"projects\": [\n    \n  ],\n  \"technical_preferences\": [\"Alarming devices\"],\n  \"assistant_expectations\": [\n    \"Provide accurate weather forecasts and alarms that can be set for any future time.\"\n  ]\n}",
         "devices": [
             "Placeholder",
             "Placeholder"
@@ -15,6 +15,6 @@
         "requirements": "provide accurate information, maintain context, assist with tasks. Responses should be clear and concise, limiting to a few sentences unless more detail is requested. You can ask questions and make requests to further help."
     },
     "meta": {
-        "counter": 0
+        "counter": 4
     }
 }

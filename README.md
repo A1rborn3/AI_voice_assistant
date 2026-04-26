@@ -1,3 +1,7 @@
+![Python](https://img.shields.io/badge/python-3.9-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-brightgreen)
+
 # AI Voice Assistant
 
 ## Description
@@ -18,7 +22,7 @@ This project is a sophisticated AI Voice Assistant named "Samantha", designed to
 
 1. Clone the repository:
    ```bash
-   git clone <https://github.com/A1rborn3/AI_voice_assistant.git>
+   git clone https://github.com/A1rborn3/AI_voice_assistant.git
    cd AI_voice_assistant
    ```
 
@@ -49,7 +53,7 @@ This project is a sophisticated AI Voice Assistant named "Samantha", designed to
 3. Wake word setup:
    - The default wake word is "Jarvis" for the PicoVoice library.
    - You can change the wake word by importing the .ppn model from the PicoVoice website and adding it to STT_Model/PicoVoice/.
-   - custom models are tied to the access key and therfore cannot be shared. I suggest using Samantha as the wake word to allign with the name of the assistant.
+   - custom models are tied to the access key and therefore cannot be shared. I suggest using Samantha as the wake word to allign with the name of the assistant.
 
 ## Usage Example
 
@@ -82,11 +86,11 @@ AI_voice_assistant/
 │   ├── STTModule.py           # Speech-to-Text logic
 │   ├── TTSModule.py           # Text-to-Speech logic
 │   ├── logging_config.py      # Logging setup
-│   ├── config/                # Configuration files
 │   └── voices/                # TTS Voice models
 ├── requirements.txt           # Python dependencies
-├── README.txt                 # Project documentation
-└──.env.example.txt            # Environment variables example
+├── README.md                 # Project documentation
+├── config/                    # Configuration files
+└──.env.example            # Environment variables example
 ```
 
 ## Future Improvements

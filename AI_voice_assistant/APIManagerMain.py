@@ -1,147 +1,163 @@
 import requests
 import json
-from datetime import datetime
+import os
+import uuid
 import threading
-import time
 import logging
+from datetime import datetime
+
+try:
+    from dotenv import load_dotenv
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    load_dotenv(env_path)
+except ImportError:
+    pass
 
 logger = logging.getLogger(__name__)
 
+# In-memory store of active reminders: {id: {time, context, thread, cancel_event}}
+active_reminders = {}
+
+
+# ─── Reminders / Alarms ───────────────────────────────────────────────────────
 
 def create_reminder(day, month, year, hour, minute, context):
-    # Ensure inputs are integers (as per tool definition) or handle strings if passed as such
+    """Set a timed reminder/alarm. Alarms and reminders are the same thing."""
     try:
-        day = int(day)
-        month = int(month)
-        year = int(year)
-        hour = int(hour)
-        minute = int(minute)
-        target_dt = datetime(year, month, day, hour, minute)
-    except ValueError:
-        return "Error: Invalid date/time format."
+        target_dt = datetime(int(year), int(month), int(day), int(hour), int(minute))
+    except (ValueError, TypeError) as e:
+        return f"Error: Invalid date/time values ({e})."
 
     now = datetime.now()
-    if target_dt < now:
-        return f"Error: The time {target_dt.strftime('%Y-%m-%d %H:%M')} is in the past. Please set a future time."
-    
-    def reminder_worker():
-        while True:
-            now = datetime.now()
-            if now >= target_dt:
-                alert_LLM(context)
+    if target_dt <= now:
+        return f"Error: {target_dt.strftime('%Y-%m-%d %H:%M')} is in the past. Please give a future time."
+
+    cancel_event = threading.Event()
+    reminder_id = str(uuid.uuid4())[:4]
+
+    def _worker(r_id, ev):
+        while not ev.is_set():
+            if datetime.now() >= target_dt:
+                _alert_user(context)
+                active_reminders.pop(r_id, None)
                 break
-            
-            # Calculate seconds until target
-            diff = (target_dt - now).total_seconds()
-            
-            # Sleep until the time, but check at least every 60 seconds
-            # to be responsive to potential system time updates or just to be safe.
-            sleep_time = min(diff, 60)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            
-    thread = threading.Thread(target=reminder_worker, daemon=True)
+            # Sleep in small increments so we can be interrupted quickly
+            diff = (target_dt - datetime.now()).total_seconds()
+            ev.wait(timeout=min(diff, 30))
+
+    thread = threading.Thread(target=_worker, args=(reminder_id, cancel_event), daemon=True)
+    active_reminders[reminder_id] = {
+        "time": target_dt.strftime('%Y-%m-%d %H:%M'),
+        "context": context,
+        "thread": thread,
+        "cancel_event": cancel_event,
+    }
     thread.start()
-    return f"Reminder set for {target_dt.strftime('%Y-%m-%d %H:%M')}"
+    return f"Reminder/Alarm set for {target_dt.strftime('%Y-%m-%d %H:%M')} with ID: {reminder_id}"
 
-    
-def alert_LLM(context):
+
+def list_reminders():
+    """Return a formatted list of all active reminders/alarms."""
+    if not active_reminders:
+        return "You currently have no active reminders or alarms."
+    lines = ["Active reminders/alarms:"]
+    for r_id, info in active_reminders.items():
+        lines.append(f"  - ID: {r_id} | Time: {info['time']} | Purpose: {info['context']}")
+    return "\n".join(lines)
+
+
+def delete_reminder(reminder_id):
+    """Cancel and remove an active reminder/alarm by its ID."""
+    if reminder_id in active_reminders:
+        active_reminders[reminder_id]['cancel_event'].set()
+        active_reminders.pop(reminder_id, None)
+        return f"Reminder/Alarm {reminder_id} has been canceled and deleted."
+    return f"Error: No reminder or alarm found with ID '{reminder_id}'."
+
+
+def _alert_user(context: str):
     """
-    Interact with the main AI_Voice_assistant's LLM and its memory.
+    Called by the background thread when a reminder fires.
+    Lazy-imports AI_voice_assistant to speak the alert via TTS.
     """
-    # Lazy import to avoid circular dependency with APIManagerMain
-    import AI_voice_assistant
-    import MemoryModule
+    try:
+        import AI_voice_assistant
+        import LLMClient
+        from datetime import datetime as _dt
 
-    # Initialize memory
-    # Assuming the config path is relative to the execution directory
-    memory = AI_voice_assistant.get_memory()
-    
-    # Use the shared process_interaction function
-    response = AI_voice_assistant.process_interaction(context, memory, "reminder")
-    
-    return response
+        memory = AI_voice_assistant.get_memory()
+        now_str = _dt.now().strftime("%Y-%m-%d %H:%M")
 
+        user_prof = memory.get_user_profile()
+        user_personality = user_prof.get("personality", "") if isinstance(user_prof, dict) else ""
 
-def get_weather_data(forecast):
-    DAYS = 1
+        # Generate a spoken alert using the conversational LLM
+        alert_prompt = (
+            f"An alarm or reminder just went off. Context: \"{context}\". "
+            "Alert the user naturally in one short, friendly sentence."
+        )
+        response = LLMClient.ask_conversational(
+            alert_prompt, [], now_str, user_personality
+        )
 
-    if forecast:
-        DAYS = 3
-    else:
-        DAYS = 1
-    
-    import os
-    from dotenv import load_dotenv
-    
-    # Load .env relative to this file
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
-    load_dotenv(env_path)
-    
-    Weather_API_KEY = os.getenv("WEATHER_API_KEY")
-    if not Weather_API_KEY:
-        return "Error: WEATHER_API_KEY not found in environment." 
-    LOCATION = "auto:ip"      # city, coords, or auto:ip
+        import TTSModule
+        TTSModule.speak(response)
+    except Exception as e:
+        logger.error(f"alert_user failed: {e}")
 
 
+# ─── Weather ──────────────────────────────────────────────────────────────────
 
-    url = f"https://api.weatherapi.com/v1/forecast.json?key={Weather_API_KEY}&q={LOCATION}&days={DAYS}"
-    data = requests.get(url).json()
+def get_weather_data(forecast: bool = False):
+    """Fetch weather data from WeatherAPI. Set forecast=True for 3-day view."""
+    days = 3 if forecast else 1
 
-    location = data["location"]
+    api_key = os.getenv("WEATHER_API_KEY")
+    if not api_key:
+        return "Error: WEATHER_API_KEY not found in environment."
+
+    url = f"https://api.weatherapi.com/v1/forecast.json?key={api_key}&q=auto:ip&days={days}"
+    try:
+        data = requests.get(url, timeout=10).json()
+    except Exception as e:
+        return f"Error fetching weather: {e}"
+
+    loc     = data["location"]
     current = data["current"]
-    forecast_days = data["forecast"]["forecastday"]
+    f_days  = data["forecast"]["forecastday"]
 
     output = {
+        "location": f"{loc.get('name')}, {loc.get('country')}",
         "current": {
-            "name": location.get("name"),
-            "country": location.get("country"),
-            "temperature_c": current.get("temp_c"),
-            "feels_like_c": current.get("feelslike_c"),
-            "humidity": current.get("humidity"),
-            "precip_mm": current.get("precip_mm"),
-            "wind_kph": current.get("wind_kph"),
-            "pressure_mb": current.get("pressure_mb"),
-            "visibility_km": current.get("vis_km"),
-            "last_updated": current.get("last_updated")
+            "temperature_c":  current.get("temp_c"),
+            "feels_like_c":   current.get("feelslike_c"),
+            "humidity":       current.get("humidity"),
+            "precip_mm":      current.get("precip_mm"),
+            "wind_kph":       current.get("wind_kph"),
+            "condition":      current["condition"]["text"],
+            "last_updated":   current.get("last_updated"),
         },
         "forecast": []
     }
 
-    for day in forecast_days:
-        date_str = day.get("date")  # like "2025-12-04"
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        day_of_week = date_obj.strftime("%A")  # -> "Thursday"
-        day_info = {
-            "date": day.get("date"),
-            "day_of_week": day_of_week,
-            "sunrise": day["astro"].get("sunrise"),
-            "sunset": day["astro"].get("sunset"),
-            "day_summary": {
-                "max_temp_c": day["day"].get("maxtemp_c"),
-                "min_temp_c": day["day"].get("mintemp_c"),
-                "avg_temp_c": day["day"].get("avgtemp_c"),
-                "max_wind_kph": day["day"].get("maxwind_kph"),
-                "total_precip_mm": day["day"].get("totalprecip_mm"),
-                "avg_humidity": day["day"].get("avghumidity"),
-                "condition": day["day"]["condition"]["text"]
-            },
-            "hourly": [
-                {
-                    "time": h.get("time"),
-                    "temp_c": h.get("temp_c"),
-                    "feels_like_c": h.get("feelslike_c"),
-                    "humidity": h.get("humidity"),
-                    "precip_mm": h.get("precip_mm"),
-                    "wind_kph": h.get("wind_kph"),
-                    "pressure_mb": h.get("pressure_mb"),
-                    "visibility_km": h.get("vis_km"),
-                    "condition": h["condition"]["text"]
-                }
-                for h in day["hour"]
-            ]
-        }
-        output["forecast"].append(day_info)
+    for day in f_days:
+        date_obj = datetime.strptime(day["date"], "%Y-%m-%d")
+        output["forecast"].append({
+            "date":       day["date"],
+            "day_of_week": date_obj.strftime("%A"),
+            "sunrise":    day["astro"].get("sunrise"),
+            "sunset":     day["astro"].get("sunset"),
+            "max_temp_c": day["day"].get("maxtemp_c"),
+            "min_temp_c": day["day"].get("mintemp_c"),
+            "condition":  day["day"]["condition"]["text"],
+            "rain_chance": day["day"].get("daily_chance_of_rain"),
+        })
 
-    logger.debug(json.dumps(output, indent=2))
-    return json.dumps(output, indent=2)
+    result = json.dumps(output, indent=2)
+    logger.debug(f"Weather result: {result}")
+    return result
+
+
+def end_conversation():
+    """Immediately stop the current conversation loop and return to waiting for the wake word."""
+    return "CONVERSATION_ENDED"

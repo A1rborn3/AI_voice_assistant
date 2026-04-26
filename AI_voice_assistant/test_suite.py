@@ -68,7 +68,7 @@ class ComponentTester:
             self.log_result("STT Initialization", False, f"Exception: {e}")
 
     def test_llm(self):
-        print("\n--- Testing LLM (Groq) ---")
+        print("\n--- Testing LLM ---")
         try:
             prompt = "What is 2+2? Answer just with the final number."
             print(f"Prompt: {prompt}")
@@ -76,14 +76,14 @@ class ComponentTester:
             print(f"Response: {response}")
             
             if response and "4" in response:
-                self.log_result("LLM (Groq)", True, f"Correct response received: {response}")
+                self.log_result("LLM", True, f"Correct response received: {response}")
             elif "rate limit" in response.lower() or "error" in response.lower():
-                 self.log_result("LLM (Groq)", False, f"API Error: {response}")
+                 self.log_result("LLM", False, f"API Error: {response}")
             else:
-                 self.log_result("LLM (Groq)", True, f"Response received (validation loose): {response}")
+                 self.log_result("LLM", True, f"Response received (validation loose): {response}")
                  
         except Exception as e:
-            self.log_result("LLM (Groq)", False, f"Exception: {e}")
+            self.log_result("LLM", False, f"Exception: {e}")
 
     def test_weather_api(self):
         print("\n--- Testing Weather API ---")
