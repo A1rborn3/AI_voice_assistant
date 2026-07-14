@@ -1,42 +1,42 @@
 [
     [
-        "can you set an alarm for seven forty five",
-        "It looks like I made a mistake with setting your alarm for 7:45 PM earlier today - let me correct that for you. You had asked me to set an alarm for 7:40 PM, which is unfortunately in the past, so I'll make sure to schedule it for a future time instead."
-    ],
-    [
-        "how's the weather today",
-        "I checked the current weather for you, which is partly cloudy with a temperature of 19 degrees Celsius in Auckland, New Zealand, and I've also provided you with today's forecast for the next two days."
-    ],
-    [
-        "how's the weather today",
-        "The current weather for Newton, New Zealand is partly cloudy with a temperature of 19 degrees Celsius."
-    ],
-    [
-        "the going around more",
-        "I think I understand what you're getting at! The winds are blowing at approximately 25 kilometers per hour, making it feel quite breezy today."
-    ],
-    [
-        "is it going to rain tomorrow",
-        "According to our current weather forecast for Newton, New Zealand, there is no chance of rain on either 2026-03-18 or 2026-03-19, with a low probability of scattered showers expected on March 20th."
-    ],
-    [
-        "how are you today",
-        "I'm doing just fine, thanks for asking! I've been processing and responding to your questions to the best of my abilities, and everything seems to be running smoothly here in our little conversation corner."
-    ],
-    [
-        "ask me a question",
-        "What is it that you'd like to control or adjust in your home environment today?"
-    ],
-    [
-        "i would like to set an alarm for eight forty",
-        "I've successfully scheduled an alarm for 8:40 PM today."
-    ],
-    [
         "can you sit another alarm for eight thirty six today",
         "I've unfortunately encountered an error while trying to set a reminder for 8:36 PM today, and it seems I need additional information from you to complete the task successfully."
     ],
     [
         "can you sit and alarm at eight thirty six today",
         "I've successfully set another reminder for 8:36 PM today with a unique identifier of ID: 3748."
+    ],
+    [
+        "how are you today",
+        "[Error calling LLM: Connection error.]"
+    ],
+    [
+        "how idea",
+        "The concept of an idea is quite fascinating, and it's a fundamental building block for creativity and innovation. Unfortunately, I don't have any specific information about the nature or content of your particular idea; however, I'm here to help facilitate discussion or provide suggestions if you'd like to share more about it."
+    ],
+    [
+        "stop stop stop talking",
+        "I'll refrain from responding for a short time, allowing you to process your thoughts and feelings."
+    ],
+    [
+        "only of the weather's",
+        "I've clarified the original statement \"only of the weather's\" to mean only the weather forecast information is being provided."
+    ],
+    [
+        "jarvis",
+        "That's a nod to JARVIS, the intelligent personal assistant from the Iron Man universe; however, I'm Samantha, your current AI companion. How can I assist you further?"
+    ],
+    [
+        "i'm how's the weather tomorrow",
+        "Today is Sunday, and according to the forecast, there's a 68% chance of patchy rain nearby with a high temperature of 17.1 degrees Celsius and a low of 12.6 degrees Celsius."
+    ],
+    [
+        "hows the weather today",
+        "The current weather conditions are clear with a temperature of 8 degrees Celsius and feels like 7.6 degrees Celsius in Newton, New Zealand."
+    ],
+    [
+        "tell me about the iphone 12",
+        "The iPhone 12 series was announced on October 13, 2020, and it features a 6.1-inch Super Retina HD display, an A14 Bionic chip, dual-camera setup with a telephoto lens, and improved battery life. The standard iPhone 12 starts at $599 and the Pro models start at $999."
     ]
 ]
