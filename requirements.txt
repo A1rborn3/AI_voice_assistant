@@ -1,12 +1,22 @@
+# Core
 openai
 python-dotenv
+requests
+numpy
+
+# Wake word + speech-to-text
 pvporcupine
 pvrecorder
+faster-whisper
+silero-vad
+onnxruntime
 vosk
+
+# Text-to-speech
+piper-tts
 sounddevice
 soundfile
-requests
-piper-tts
+
+# Vision
 torch
 ultralytics
-pathlib

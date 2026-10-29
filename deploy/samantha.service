@@ -1,0 +1,26 @@
+# systemd unit for running Samantha on a Raspberry Pi (or any Linux box).
+# Installed by deploy/install_pi.sh, which fills in __USER__ and __APP_DIR__.
+#
+#   sudo systemctl status samantha      # is it running?
+#   journalctl -u samantha -f           # console output
+#   tail -f __APP_DIR__/AI_voice_assistant/application.log   # detailed log
+
+[Unit]
+Description=Samantha voice assistant and kitchen hazard monitor
+Wants=network-online.target sound.target
+After=network-online.target sound.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=__APP_DIR__/Samantha.venv/bin/python AI_voice_assistant/AI_voice_assistant.py --mode voice
+# A safety monitor must come back by itself after a crash
+Restart=always
+RestartSec=5
+# Let the process use the user's PipeWire/PulseAudio session for the mic and speaker
+Environment=XDG_RUNTIME_DIR=/run/user/__UID__
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

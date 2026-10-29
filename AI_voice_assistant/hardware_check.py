@@ -1,4 +1,11 @@
+"""
+Hardware/network smoke check: plays audio, opens the mic engines, calls the
+LLM server and WeatherAPI. Run it by hand on the target machine:
 
+    python AI_voice_assistant/hardware_check.py
+
+The automated unit tests (no hardware, no network) live in tests/ — run `pytest`.
+"""
 import time
 import logging
 import os
@@ -51,18 +58,15 @@ class ComponentTester:
         try:
             # Only testing initialization to avoid blocking for user input
             stt = STTModule.STFTModule()
-            
+
             # Explicitly initialize wake word engine for testing
-            stt.porcupine = stt._init_porcupine()
-            
-            if stt.vosk_model and stt.porcupine:
-                self.log_result("STT Initialization", True, "Vosk and Picovoice models loaded.")
+            if stt.ensure_wake_word_engine():
+                self.log_result("STT Initialization", True,
+                                f"{stt.transcriber.name} + {type(stt.vad).__name__} + wake word '{stt.wake_word}' loaded.")
             else:
-                 self.log_result("STT Initialization", False, "One or more models failed to load.")
-            
-            # Clean up
-            if stt.porcupine: stt.porcupine.delete()
-            if stt.recorder: stt.recorder.delete()
+                self.log_result("STT Initialization", False, "Wake word engine failed to load.")
+
+            stt.close()
             
         except Exception as e:
             self.log_result("STT Initialization", False, f"Exception: {e}")
@@ -72,7 +76,7 @@ class ComponentTester:
         try:
             prompt = "What is 2+2? Answer just with the final number."
             print(f"Prompt: {prompt}")
-            response = LLMClient.askLLM(prompt)
+            response = LLMClient.ask_raw(prompt)
             print(f"Response: {response}")
             
             if response and "4" in response:
@@ -102,11 +106,11 @@ class ComponentTester:
     def test_memory(self):
         print("\n--- Testing Memory Module ---")
         try:
-             mem = MemoryModule.Memory("config/memory.json")
-             user = mem.get_user_profile().get('name')
+             mem = MemoryModule.Memory(MemoryModule.DEFAULT_MEMORY_PATH)
+             user = mem.get_user_profile().get('name') or "(not set)"
              assistant = mem.get_assistant_profile().get('name')
-             
-             if user and assistant:
+
+             if assistant:
                  self.log_result("Memory Module", True, f"Loaded profiles (User: {user}, AI: {assistant})")
              else:
                  self.log_result("Memory Module", False, "Failed to retrieve names.")

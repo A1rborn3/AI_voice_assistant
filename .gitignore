@@ -413,3 +413,14 @@ AIAssistant312/
 # AI Voice Assistant Memory Files
 **/config/memory.json
 **/config/*.conversation.json
+**/config/reminders.json
+**/config/*.tmp
+**/config/*.corrupt
+
+# Runtime files
+AI_voice_assistant/application.log
+**/config/lists.json
+**/config/notes.json
+**/config/weather_cache.json
+**/config/events.db
+**/config/snapshots/

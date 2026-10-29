@@ -6,6 +6,11 @@ def setup_logging(log_filename="application.log"):
     """
     Configures logging to write to a file and NOT to the console (stdout).
     This allows keeping the main console clean for user interaction.
+
+    Convention: print() is only for the console UI the user reads (prompts,
+    "You said", the assistant's reply, listening status). Everything
+    diagnostic goes through `logging` and ends up in application.log
+    (tail it with debug_monitor.bat).
     """
     # Determine absolute path for the log file to ensure it's the same file the .bat watches
     # (Assuming .bat is in the same directory as this script)
