@@ -22,9 +22,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # CPU-only torch: much smaller than the default CUDA build
-          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # CPU-only torch: much smaller than the default CUDA build. torch and
+          # torchvision must come from the same index together, otherwise
+          # ultralytics pulls a PyPI torchvision built for a different torch
+          # ("operator torchvision::nms does not exist").
+          python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements-dev.txt
+          python -c "import torch, torchvision, torchvision.ops; print('torch', torch.__version__, 'torchvision', torchvision.__version__)"
 
       - name: Run unit tests
         run: python -m pytest

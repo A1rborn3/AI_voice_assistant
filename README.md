@@ -35,6 +35,20 @@ Speech recognition, speech synthesis, the language model and object detection al
 | "What's 17% of 240?" / "how many grams in 3 pounds?" | Exact calculator and unit converter (the LLM never does the maths) |
 | "What's the weather like?" / "forecast for the next few days" | WeatherAPI, with a 6-hour cache if the service is down |
 | "Turn the volume down to 4" | Volume; non-urgent speech is quieter during `QUIET_HOURS` |
+| "What do you know about Sarah?" / "forget that I like jazz" | People memory (see below) |
+
+### People memory (small RAG)
+Samantha remembers people without pasting a whole profile into every prompt:
+- **Learning:** every `FACT_EXTRACTION_EVERY` exchanges (default 4), the model pulls out lasting facts *the user said*, such as "Sarah is allergic to peanuts" or "Ethan has a cat called Milo". They're stored one per row in `config/people.db`, each with an embedding.
+- **Checks before storing:**
+  - Requests like alarms and timers are rejected.
+  - Facts whose key words never came from the user (only from the assistant) are skipped.
+  - Near-duplicates are merged.
+  - A fact that changes an older one ("Sarah moved to Wellington") replaces it.
+- **Retrieval:** each request gets only the `MEMORY_FACTS_K` (default 4) most relevant facts by meaning, plus a few facts about anyone it names. "Can Sarah have peanut butter?" brings up her allergy; "set a timer" brings up nothing.
+- **Without the embedding model,** it falls back to keyword matching, and missing embeddings are filled in later.
+- **The old JSON profile is converted** into facts automatically on first start.
+- **Who is speaking:** it currently assumes the main user (`user.name` in `memory.json`) and learns about other people by name. Recognising different people's voices would be the next step.
 
 ### Voice pipeline
 - **Wake word:** Porcupine. **End of speech:** [silero-vad](https://github.com/snakers4/silero-vad). **Speech-to-text:** [faster-whisper](https://github.com/SYSTRAN/faster-whisper), with Vosk as the fallback. **Speech output:** [Piper](https://github.com/rhasspy/piper), with times, units and symbols rewritten so they read naturally.
@@ -64,7 +78,7 @@ The default model is **Qwen3-4B-Instruct-2507** (`qwen/qwen3-4b-2507` in LM Stud
    Samantha.venv/Scripts/python -m pip install -r requirements-dev.txt
    ```
    (Use `requirements.txt` alone if you don't need the tests; on Linux, use `Samantha.venv/bin/python`.) The first voice-mode run downloads the Whisper model (~145 MB for `base.en`) into the Hugging Face cache.
-3. Start a local LLM server. In LM Studio, load **Qwen3-4B-Instruct-2507** (`qwen/qwen3-4b-2507`; use the *Instruct* build, not *Thinking*) with full GPU offload if you have a GPU. `llama-3.2-3b-instruct` also works if you set `LLM_MODEL`; for searching notes by meaning, also load `text-embedding-nomic-embed-text-v1.5`. Then start the server on port 1234.
+3. Start a local LLM server. In LM Studio, load **Qwen3-4B-Instruct-2507** (`qwen/qwen3-4b-2507`; use the *Instruct* build, not *Thinking*) with full GPU offload if you have a GPU. `llama-3.2-3b-instruct` also works if you set `LLM_MODEL`. Also load `text-embedding-nomic-embed-text-v1.5`, which people memory and notes use to search by meaning. Then start the server on port 1234.
 
 ### Raspberry Pi (runs as a service)
 ```bash
@@ -86,7 +100,8 @@ bash deploy/install_pi.sh
 2. **Memory and persona:**
    - `config/memory.json` is created from `config/memory.example.json` on the first run.
    - Edit its `assistant` block to change Samantha's name, personality and purpose.
-   - The user profile is learned automatically every 10 conversation turns.
+   - Set `user.name` to your name: it's who Samantha assumes she's talking to, and what learned facts about you are filed under.
+   - Facts about people are learned automatically (see *People memory*).
 
 3. **Wake word:**
    - The custom "Samantha" `.ppn` file is built for Raspberry Pi; everywhere else the built-in `WAKE_WORD_FALLBACK` keyword (default **"Jarvis"**) is used.
@@ -133,7 +148,8 @@ AI_voice_assistant/
 │   ├── AnnouncerModule.py       # Priority queue for everything said unprompted
 │   ├── AssistantTools.py        # Timers, lists, notes, calculator, units, volume
 │   ├── APIManagerMain.py        # Reminders, weather
-│   ├── MemoryModule.py          # Profiles + conversation history
+│   ├── MemoryModule.py          # Persona + conversation history
+│   ├── PeopleMemory.py          # Facts about people: learning, retrieval, tools
 │   ├── STTModule.py             # Wake word, VAD endpointing, Whisper/Vosk
 │   ├── TTSModule.py             # Piper speech, volume, speech normalisation
 │   └── hardware_check.py        # Manual hardware/network smoke test

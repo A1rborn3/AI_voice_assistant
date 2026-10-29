@@ -132,3 +132,7 @@ def test_weather_cache_too_old_is_ignored(weather_key, monkeypatch):
         {"saved_at": "2000-01-01 00:00", "forecast": False, "result": "{}"}))
     with mock.patch("requests.get", side_effect=ConnectionError("offline")):
         assert APIManagerMain.get_weather_data(False).startswith("Error fetching weather")
+
+
+def test_clean_llm_response_strips_emoji():
+    assert app.clean_llm_response("You've got this! 😊 Good luck ❤️") == "You've got this!  Good luck"

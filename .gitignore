@@ -424,3 +424,4 @@ AI_voice_assistant/application.log
 **/config/weather_cache.json
 **/config/events.db
 **/config/snapshots/
+**/config/people.db

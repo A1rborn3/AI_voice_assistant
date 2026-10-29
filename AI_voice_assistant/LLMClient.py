@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 import APIManagerMain
 import AssistantTools
 import HazardModule
+import PeopleMemory
 import settings
 
 try:
@@ -232,6 +233,24 @@ TOOLS = {
         "required": ["note_id"],
         "callable": AssistantTools.delete_note,
     },
+    # ── people memory ──
+    "recall_person": {
+        "group": "people",
+        "description": "Say what you remember about a person, e.g. 'what do you know about Sarah' or 'what do you know about me'.",
+        "schema": {"name": {"type": "string", "description": "The person's name, or 'me' for the user"}},
+        "required": [],
+        "callable": PeopleMemory.recall_person,
+    },
+    "forget_fact": {
+        "group": "people",
+        "description": "Forget something remembered about a person, e.g. 'forget that I like jazz'. Use 'everything' to forget all of it.",
+        "schema": {
+            "what":   {"type": "string", "description": "The fact to forget, in the user's words"},
+            "person": {"type": "string", "description": "Whose fact it is; omit or 'me' for the user"},
+        },
+        "required": ["what"],
+        "callable": PeopleMemory.forget_fact,
+    },
     # ── maths ──
     "calculate": {
         "group": "maths",
@@ -284,6 +303,7 @@ WORD_GATES = {
                                    r"that'?ll be all|thanks|thank you|cheers|no more|nothing else|"
                                    r"i'?m done|we'?re done|stop)\b", re.IGNORECASE),
     "delete_note":      re.compile(r"\b(?:delete|remove|forget|erase)\b", re.IGNORECASE),
+    "forget_fact":      re.compile(r"\b(?:forget|delete|remove|erase)\b", re.IGNORECASE),
     "delete_reminder":  re.compile(r"\b(?:delete|remove|cancel|forget|get rid of|turn off)\b", re.IGNORECASE),
     "cancel_timer":     re.compile(r"\b(?:cancel|stop|delete|remove|kill|turn off)\b", re.IGNORECASE),
     "clear_list":       re.compile(rf"\b(?:clear|empty|wipe|delete|{_YES})\b", re.IGNORECASE),
@@ -299,6 +319,7 @@ TOOL_GROUPS = {
     "timers":    r"timer|countdown|time left|how long (?:is )?left",
     "lists":     r"\blists?\b|shopping|grocer|to-?do|\bbuy\b|\badd\b.*\bto\b|\bremove\b|\bclear\b",
     "notes":     r"remember|\bnotes?\b|where(?:'s| is| are| did| do)|recall|forget",
+    "people":    r"know about|what do you (?:know|remember)|tell me about (?:me|myself)|who is|who's|forget (?:that|about|what|everything)",
     "maths":     r"calculat|\d\s*[-+*/x×÷^%]\s*\d|plus|minus|times|divided|percent|square root|convert|how many|"
                  r"celsius|fahrenheit|kilo|pound|ounce|gram|litre|liter|cups?\b|tablespoon|teaspoon|inch|feet|foot|mile|metre|meter",
     "volume":    r"volume|louder|quieter|softer|turn (?:it |yourself )?(?:up|down)|too loud|can't hear|mute",
@@ -308,8 +329,12 @@ _GROUP_RES = {g: re.compile(p, re.IGNORECASE) for g, p in TOOL_GROUPS.items()}
 
 def select_tools(user_text: str, history: list | None = None) -> list:
     """Names of the tools to offer for this request."""
-    # The assistant's last reply counts too, so "yes, clear it" still finds clear_list
-    last_reply = next((m.get("content") or "" for m in reversed(history or []) if m.get("role") == "assistant"), "")
+    # For short follow-ups the assistant's last reply counts too, so "yes, clear it"
+    # still finds clear_list. Not for full sentences: tools offered only because of
+    # the last reply prime the model to talk about them ("my cat is sick" -> kitchen safety)
+    last_reply = ""
+    if len(user_text.split()) <= 5:
+        last_reply = next((m.get("content") or "" for m in reversed(history or []) if m.get("role") == "assistant"), "")
     text = f"{user_text}\n{last_reply}"
     groups = {"core"} | {g for g, rx in _GROUP_RES.items() if rx.search(text)}
     return [name for name, info in TOOLS.items() if info["group"] in groups]
@@ -494,7 +519,9 @@ def execute_tool_call(tool_name: str, arguments) -> str:
 
 # ─── Prompting ────────────────────────────────────────────────────────────────
 def build_system_prompt(now_str: str, user_profile_text: str = "",
-                        assistant_profile: dict | None = None, with_tools: bool = False) -> str:
+                        assistant_profile: dict | None = None, with_tools: bool = False,
+                        speaker: str = "", tool_groups=None) -> str:
+    """`user_profile_text` holds the remembered facts relevant to this request (PeopleMemory)."""
     """Persona comes from memory.json's `assistant` block; only the speech/tool rules live here."""
     profile = assistant_profile if isinstance(assistant_profile, dict) else {}
     name = profile.get("name") or "Samantha"
@@ -523,26 +550,37 @@ def build_system_prompt(now_str: str, user_profile_text: str = "",
         "2. Never use emojis, markdown, lists, code, JSON or symbols.",
         "3. Use the metric system (Celsius, kilometres).",
         "4. Answer repeated questions fully and politely; never say 'as I mentioned before'.",
+        "5. Never promise to remind, watch, alert or do anything later unless a tool did it in this turn.",
     ]
     if with_tools:
+        # Topic-specific rules only when those tools are offered: always mentioning
+        # kitchen safety made the model bring it up for "my cat has been sick"
+        groups = set(tool_groups) if tool_groups is not None else set(TOOL_GROUPS) | {"core"}
         lines += [
             "",
             "Tool rules:",
             "- Use a tool whenever the request needs one of your tools; for normal conversation just reply.",
             "- Call tools only through the tool-calling interface. Never write a function call or JSON in your reply.",
             "- Never say you set, added, deleted or checked something unless a tool result in this turn confirms it.",
-            "- Never guess about the stove or kitchen safety: use the kitchen safety tools.",
-            "- For arithmetic and unit conversions always use calculate or convert_units.",
-            "- Speech recognition makes mistakes: 'sit an alarm' means 'set an alarm'.",
-            "- Resolve relative times like 'tomorrow at 7' against the current date/time; give times as 24-hour HH:MM.",
-            "- Reminders, timers and notes are identified by number; 'alarm number one' means reminder_id 1.",
-            "- If a tool returns an error, explain it briefly and ask for what is missing.",
         ]
+        if "hazards" in groups:
+            lines.append("- Never guess about the stove or kitchen safety: use the kitchen safety tools.")
+        if "maths" in groups:
+            lines.append("- For arithmetic and unit conversions always use calculate or convert_units.")
+        if groups & {"reminders", "timers"}:
+            lines += [
+                "- Speech recognition makes mistakes: 'sit an alarm' means 'set an alarm'.",
+                "- Resolve relative times like 'tomorrow at 7' against the current date/time; give times as 24-hour HH:MM.",
+            ]
+        if groups & {"reminders", "timers", "notes"}:
+            lines.append("- Reminders, timers and notes are identified by number; 'alarm number one' means reminder_id 1.")
     lines += [
         "",
         f"Current date/time: {now_str} {weekday}".rstrip(),
         *([f"Tomorrow is {tomorrow}."] if tomorrow else []),
-        f"What you know about the user: {user_profile_text or 'nothing yet'}",
+        f"You are talking to {speaker}." if speaker else "",
+        "Things you remember that may be relevant (use only if they help; never mention this list):",
+        user_profile_text or "- nothing relevant",
     ]
     return "\n".join(lines)
 
@@ -685,6 +723,25 @@ _CLAIM_RE = re.compile(
     r"weather|forecast|degrees|rain)\b", re.IGNORECASE)
 
 
+# Promises of future action ("I'll make sure to remind you", "I'll keep an eye on it")
+# ("I'll remember that" is allowed: people memory really does remember.)
+_PROMISE_RE = re.compile(
+    r"\b(?:i'?ll|i will|i'?m going to|let me)\s+(?:make sure|remind|keep an eye|monitor|watch|alert|notify|"
+    r"let you know|check|set|add|track|look into|look up|double-check)\b", re.IGNORECASE)
+# Added to the system prompt for a fresh retry. (A system message placed after the
+# assistant's turn makes qwen3-4b return an empty reply, so the retry starts over.)
+NO_PROMISES_NUDGE = ("For this reply: you have no tool for what they said, so do not offer or promise to check, "
+                     "set up, look up, monitor or remind. Respond warmly and naturally in one or two sentences, "
+                     "like a friend would. You may say you'll remember it.")
+
+
+def _drop_promises(text: str) -> str:
+    """Last resort: remove sentences that promise an action nothing performed."""
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    kept = [s for s in sentences if not _PROMISE_RE.search(s)]
+    return " ".join(kept) if kept else "Thanks for letting me know."
+
+
 def _claims_action(text: str, offered: list | None = None) -> bool:
     if _CLAIM_RE.search(text):
         return True
@@ -772,7 +829,8 @@ def _text_tool_calls(content: str, offered: list | None) -> list:
 
 
 def respond(user_text: str, history: list, now_str: str,
-            user_profile_text: str = "", assistant_profile: dict | None = None) -> AssistantReply:
+            user_profile_text: str = "", assistant_profile: dict | None = None,
+            speaker: str = "") -> AssistantReply:
     """
     Main entry point: one request with tools attached. Normal conversation is
     answered in that single call; tool requests get one follow-up call to
@@ -780,13 +838,14 @@ def respond(user_text: str, history: list, now_str: str,
     """
     # Small models get worse at tool calling as context grows; keep recent turns only
     history = history[-2 * settings.LLM_HISTORY_TURNS:] if settings.LLM_HISTORY_TURNS > 0 else []
+    offered = select_tools(user_text, history)
+    logger.debug(f"[Tools] Offering: {offered}")
     messages = [{"role": "system", "content": build_system_prompt(
-        now_str, user_profile_text, assistant_profile, with_tools=True)}]
+        now_str, user_profile_text, assistant_profile, with_tools=True, speaker=speaker,
+        tool_groups={TOOLS[n]["group"] for n in offered})}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_text})
 
-    offered = select_tools(user_text, history)
-    logger.debug(f"[Tools] Offering: {offered}")
     tools_used = []
     retried = False
     force_tool = False
@@ -813,7 +872,10 @@ def respond(user_text: str, history: list, now_str: str,
                 return AssistantReply(EMPTY_REPLY, error=True, tools_used=tools_used)
         if not calls:
             text = (msg.content or "").strip()
-            has_real_tools = any(TOOLS[n]["group"] != "core" for n in offered)
+            # Only force a tool when the user's OWN words point at one; groups offered
+            # because of the previous reply ("kitchen safety") made "my cat has been
+            # sick" force a stove-status check
+            has_real_tools = any(TOOLS[n]["group"] != "core" for n in select_tools(user_text))
             if (round_no == 0 and not retried and has_real_tools and text
                     and not _looks_like_json(text) and _claims_action(text, offered)):
                 # Claimed an action / reported data without calling anything: make it use a tool
@@ -834,6 +896,17 @@ def respond(user_text: str, history: list, now_str: str,
                 # e.g. the server dropped a malformed tool call; don't go silent
                 logger.warning(f"[LLM] No usable reply: {text!r}")
                 return AssistantReply(EMPTY_REPLY, error=True, tools_used=tools_used)
+            if not tools_used and _PROMISE_RE.search(text):
+                # "I'll make sure to remind you..." with nothing set: ask once for an honest reply
+                logger.warning(f"[LLM] Reply promises an action no tool performed, regenerating: {text!r}")
+                redo = _complete([{"role": "system", "content": messages[0]["content"] + "\n\n" + NO_PROMISES_NUDGE},
+                                  *messages[1:]],
+                                 max_tokens=200, temperature=LLM_TEMPERATURE)
+                better = (redo.content or "").strip() if redo else ""
+                if better and not _looks_like_json(better):
+                    text = better
+                if _PROMISE_RE.search(text):
+                    text = _drop_promises(text)
             return AssistantReply(text, tools_used=tools_used)
 
         messages.append({
@@ -877,10 +950,11 @@ def respond(user_text: str, history: list, now_str: str,
 
 
 def ask_conversational(user_text: str, context_messages: list, now_str: str,
-                       user_profile_text: str = "", assistant_profile: dict | None = None) -> str:
+                       user_profile_text: str = "", assistant_profile: dict | None = None,
+                       speaker: str = "") -> str:
     """Persona reply without tools (used for proactive alerts)."""
     messages = [{"role": "system", "content": build_system_prompt(
-        now_str, user_profile_text, assistant_profile, with_tools=False)}]
+        now_str, user_profile_text, assistant_profile, with_tools=False, speaker=speaker)}]
     messages.extend(context_messages)
     messages.append({"role": "user", "content": user_text})
     return _chat(messages, max_tokens=150, temperature=LLM_TEMPERATURE)

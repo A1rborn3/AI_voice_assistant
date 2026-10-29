@@ -397,6 +397,15 @@ def recall_note(query):
     """Search saved notes."""
     matches = get_notes_store().search(str(query or ""))
     if not matches:
+        # Facts learned about people count too ("where does Sarah work?")
+        try:
+            import PeopleMemory
+            facts = PeopleMemory.get_people_memory().search(str(query or ""), k=2)
+        except Exception:
+            logger.exception("People memory search failed")
+            facts = []
+        if facts:
+            return "You told me: " + " ".join(f["fact"].rstrip(".") + "." for f in facts)
         return f"I don't have any notes about {query}."
     if len(matches) == 1:
         return f"You told me: {matches[0]['text'].rstrip('.')}."

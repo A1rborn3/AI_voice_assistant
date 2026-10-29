@@ -2,27 +2,6 @@
     "user": {
         "name": "",
         "location": "",
-        "personality": {
-            "identity": {
-                "name": "",
-                "prefered_name": "",
-                "age": "",
-                "location": "",
-                "education": "",
-                "field_of_study": "",
-                "work": "",
-                "skills": [],
-                "other_details": []
-            },
-            "interests": [],
-            "hobbies": [],
-            "projects": [],
-            "technical_preferences": [],
-            "assistant_expectations": [
-                "maintain context",
-                "accurate explanations"
-            ]
-        },
         "devices": []
     },
     "assistant": {
@@ -32,6 +11,7 @@
         "requirements": "Provide accurate information, maintain context and assist with tasks. Keep responses clear and concise, a few sentences at most unless more detail is requested. You can ask questions to help further."
     },
     "meta": {
-        "counter": 0
+        "counter": 0,
+        "profile_migrated": true
     }
 }

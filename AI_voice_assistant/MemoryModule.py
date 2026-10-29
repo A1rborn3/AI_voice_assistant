@@ -38,7 +38,6 @@ DEFAULT_DATA = {
     "user": {
         "name": "",
         "location": "",
-        "personality": EMPTY_PROFILE,
         "devices": []
     },
     "assistant": {
@@ -113,19 +112,36 @@ def _normalise_profile(value) -> dict:
 
 
 class Memory:
-    def __init__(self, path, example_path=None):
+    """
+    Assistant persona + recent conversation (memory.json / .conversation.json).
+    Facts about people live in PeopleMemory (config/people.db): they are
+    learned from the conversation every FACT_EXTRACTION_EVERY exchanges and
+    only the relevant ones are added to each request (see memory_context).
+    """
+
+    def __init__(self, path, example_path=None, people=None):
         # store path as a Path object for reliable filesystem ops
         self.path = Path(path)
         self.example_path = Path(example_path) if example_path else self.path.with_name("memory.example.json")
         self.conversation_path = self.path.with_name(self.path.stem + ".conversation.json")
         self.conversation = ConversationQueue(max_size=10)
-        # counter cycles 0..10 and is incremented each time a conversation pair is added
+        # exchanges added since facts were last learned from the conversation
         self.counter = 0
-        # Guards data/conversation/counter and file writes; the personality update
-        # runs in a background thread while the main loop keeps adding messages.
+        # Guards data/conversation/counter and file writes; fact learning runs
+        # in a background thread while the main loop keeps adding messages.
         self._lock = threading.RLock()
         self._update_running = False
+        self._people = people
         self._load()
+
+    @property
+    def people(self):
+        """The PeopleMemory store (the shared one unless given); migrates the old profile on first use."""
+        if self._people is None:
+            import PeopleMemory
+            self._people = PeopleMemory.get_people_memory()
+        self._migrate_profile()
+        return self._people
 
     def _initial_data(self) -> dict:
         """Starting memory for a fresh install: the committed example file, else built-in defaults."""
@@ -186,8 +202,28 @@ class Memory:
                 self.data[section] = copy.deepcopy(DEFAULT_DATA[section])
         for key, value in DEFAULT_DATA["assistant"].items():
             self.data["assistant"].setdefault(key, value)
-        self.data["user"]["personality"] = _normalise_profile(self.data["user"].get("personality"))
+        if "personality" in self.data["user"]:
+            # Legacy profile: only kept until it has been imported into PeopleMemory
+            self.data["user"]["personality"] = _normalise_profile(self.data["user"].get("personality"))
         return json.dumps(self.data, sort_keys=True, default=str) != before
+
+    def _migrate_profile(self):
+        """One-off: turn the old JSON profile into facts, then drop it from memory.json."""
+        with self._lock:
+            if self.data["meta"].get("profile_migrated") or self._people is None:
+                return
+            profile = self.data["user"].get("personality")
+            self.data["meta"]["profile_migrated"] = True
+        try:
+            added = self._people.import_profile(self.get_speaker_name(), profile) if profile else 0
+            logger.info(f"Imported {added} facts from the old JSON profile into people memory")
+            with self._lock:
+                self.data["user"].pop("personality", None)
+                self.save()
+        except Exception:
+            logger.exception("Profile migration failed; will retry next start")
+            with self._lock:
+                self.data["meta"]["profile_migrated"] = False
 
     def save(self):
         with self._lock:
@@ -217,10 +253,26 @@ class Memory:
     def get_assistant_profile(self):
         return self.data["assistant"]
 
+    def get_speaker_name(self) -> str:
+        """Who the assistant is talking to (the main user until speaker recognition exists)."""
+        return (self.data["user"].get("name") or "").strip() or "The user"
+
+    def memory_context(self, query: str) -> str:
+        """Only the remembered facts relevant to `query`, for the prompt."""
+        try:
+            return self.people.context_for(query)
+        except Exception:
+            logger.exception("People memory lookup failed")
+            return ""
+
     def get_user_profile_text(self) -> str:
-        """The learned user profile as compact JSON for prompts."""
-        with self._lock:
-            return json.dumps(self.data["user"].get("personality", {}), ensure_ascii=False)
+        """A few recent facts about the speaker (for prompts with no user request, e.g. alerts)."""
+        try:
+            facts = self.people.facts_about(self.get_speaker_name())[-5:]
+        except Exception:
+            logger.exception("People memory lookup failed")
+            return ""
+        return "\n".join(f"- {f}" for f in facts)
 
     def get_history_messages(self) -> list:
         """Recent conversation as OpenAI-style {role, content} messages."""
@@ -233,27 +285,26 @@ class Memory:
         return messages
 
     def add_message_pair(self, user_input, assistant_output):
-        """Store recent conversation pair and advance the 0..10 counter."""
+        """Store a conversation pair; every FACT_EXTRACTION_EVERY pairs, learn facts in the background."""
         with self._lock:
-            # increment and wrap back to 0 after reaching 10
-            self.counter = (self.counter + 1) % 11
+            self.counter += 1
             self.conversation.add(user_input, assistant_output)
-            # Trigger personality update when the counter reaches 10,
-            # unless a previous update is still running
-            start_update = self.counter == 10 and not self._update_running
+            start_update = self.counter >= max(settings.FACT_EXTRACTION_EVERY, 1) and not self._update_running
             if start_update:
                 self._update_running = True
+                pending = self.conversation.to_list()[-min(self.counter, self.conversation.max_size):]
+                self.counter = 0
         if start_update:
             # Run in a daemon thread so it doesn't block the main program
-            t = threading.Thread(target=self._run_update_personality_safe, daemon=True)
+            t = threading.Thread(target=self._run_learn_safe, args=(pending,), daemon=True)
             t.start()
 
-    def _run_update_personality_safe(self):
+    def _run_learn_safe(self, pairs):
         """Wrapper to catch exceptions in the background thread."""
         try:
-            self.update_user_personality()
+            self.learn_facts(pairs)
         except Exception:
-            logger.exception("update_user_personality failed in background thread")
+            logger.exception("Learning facts failed in background thread")
         finally:
             with self._lock:
                 self._update_running = False
@@ -262,51 +313,15 @@ class Memory:
         with self._lock:
             return self.conversation.get_history()
 
-    def update_user_personality(self):
-        """
-        Generate an updated user profile from recent conversation via the LLM.
-        This function imports LLMClient lazily to avoid potential circular imports.
-        Only a valid JSON object replaces the stored profile.
-        """
-        with self._lock:
-            conversation_history = self.get_recent_conversation()
-            personality = json.dumps(self.data["user"].get("personality", {}), indent=2, ensure_ascii=False)
-        prompt = f"""Update the user's long-term profile using the recent conversation.
-Do NOT describe personality types such as "outgoing," "inquisitive,"
-"calm," etc. Focus ONLY on stable, factual, practical information
-that is useful for future interactions.
-
-Output strictly as JSON in this structure:
-
-{json.dumps(EMPTY_PROFILE, indent=2)}
-
-Rules:
-- Keep entries short, factual, and verifiable from the conversation.
-- If something is unknown, leave it empty, null without change.
-- Merge new facts with the existing profile without removing correct ones.
-- Only include information clearly mentioned in the conversation.
-- Avoid assumptions or personality descriptors.
-- Keep the final output under 200 words total.
-
-Recent conversation:
-{conversation_history}
-
-Existing profile:
-{personality}
-"""
-        try:
-            # lazy import to reduce circular import risk
-            import LLMClient
-            raw = LLMClient.ask_raw(prompt, max_tokens=400)
-            # Only accept a real JSON profile; LLM errors come back as plain
-            # strings and must never overwrite the stored profile.
-            parsed = LLMClient.extract_json_object(raw)
-            if parsed:
-                with self._lock:
-                    self.data.setdefault("user", {})["personality"] = parsed
-                    self.save()
-                logger.info("User personality updated by LLM.")
-            else:
-                logger.warning(f"Personality update skipped; LLM output was not a JSON profile: {raw!r}")
-        except Exception:
-            logger.exception("Failed to update personality via LLM.")
+    def learn_facts(self, pairs=None) -> list:
+        """Extract lasting facts from these (user, assistant) pairs into people memory."""
+        import PeopleMemory
+        if pairs is None:
+            with self._lock:
+                pairs = self.conversation.to_list()
+        store = self.people
+        store.backfill_embeddings()
+        learned = PeopleMemory.extract_and_store(store, pairs, self.get_speaker_name())
+        if learned:
+            logger.info(f"Learned {len(learned)} fact(s): {learned}")
+        return learned

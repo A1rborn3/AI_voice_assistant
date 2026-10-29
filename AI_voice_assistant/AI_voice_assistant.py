@@ -46,6 +46,7 @@ QUIT_COMMANDS = {"exit", "exit program", "shut down", "shutdown"}
 STOP_KEYWORDS = ("stop", "cancel", "nevermind", "never mind", "goodbye", "good bye", "exit")
 # Consecutive microphone failures before the assistant says so out loud
 MIC_FAILURE_ALERT = 3
+_EMOJI_RE = re.compile("[\U0001F000-\U0001FAFF☀-➿️‍]")
 
 
 # ─── Globals ──────────────────────────────────────────────────────────────────
@@ -68,6 +69,8 @@ def clean_llm_response(text: str) -> str:
     text = re.sub(r'^\s*[-*#]+\s*', '', text, flags=re.MULTILINE)
     # Drop bold/italic markers
     text = text.replace("**", "").replace("__", "")
+    # Drop emoji (the model adds them despite the prompt; Piper can't say them)
+    text = _EMOJI_RE.sub("", text)
     # Collapse whitespace
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return " ".join(lines)
@@ -104,8 +107,9 @@ def process_interaction(user_text: str, mem: MemoryModule.Memory) -> str | None:
         user_text,
         mem.get_history_messages(),
         now_str,
-        mem.get_user_profile_text(),
+        mem.memory_context(user_text),   # only the remembered facts relevant to this request
         mem.get_assistant_profile(),
+        speaker=mem.get_speaker_name(),
     )
     if reply.tools_used:
         logger.info(f"[Main] Tools used: {reply.tools_used}")
@@ -120,8 +124,8 @@ def process_interaction(user_text: str, mem: MemoryModule.Memory) -> str | None:
     print(f"{name}: {spoken_clean}")
     TTSModule.speak(spoken_clean)
 
-    # Save to memory (add_message_pair also schedules the periodic background
-    # personality update every 10 turns). Errors aren't kept as history.
+    # Save to memory (add_message_pair also schedules learning facts about
+    # people in the background every few turns). Errors aren't kept as history.
     if not reply.error:
         mem.add_message_pair(user_text, spoken_clean)
         mem.save()

@@ -363,7 +363,8 @@ def _alert_user(context: str, missed_at: str | None = None):
 
         response = LLMClient.ask_conversational(
             alert_prompt, [], now_str,
-            memory.get_user_profile_text(), memory.get_assistant_profile()
+            memory.memory_context(context), memory.get_assistant_profile(),
+            speaker=memory.get_speaker_name(),
         ) or fallback  # still alert if the LLM is unreachable
 
         # The announcer waits for a quiet moment, so this never talks over a reply

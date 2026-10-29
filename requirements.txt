@@ -19,4 +19,5 @@ soundfile
 
 # Vision
 torch
+torchvision        # install together with torch (see deploy/install_pi.sh)
 ultralytics

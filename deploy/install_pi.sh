@@ -14,8 +14,9 @@ sudo apt-get install -y python3-venv python3-dev libportaudio2 libatlas-base-dev
 echo "Creating virtual environment in $APP_DIR/Samantha.venv..."
 python3 -m venv "$APP_DIR/Samantha.venv"
 "$APP_DIR/Samantha.venv/bin/python" -m pip install --upgrade pip
-# CPU-only torch keeps the download small on a Pi
-"$APP_DIR/Samantha.venv/bin/python" -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+# CPU-only torch keeps the download small on a Pi. torch and torchvision are
+# installed together from the same index so their versions match.
+"$APP_DIR/Samantha.venv/bin/python" -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 "$APP_DIR/Samantha.venv/bin/python" -m pip install -r "$APP_DIR/requirements.txt"
 
 if [ ! -f "$APP_DIR/.env" ]; then

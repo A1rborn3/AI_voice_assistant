@@ -58,7 +58,7 @@ def test_system_prompt_uses_persona_from_memory():
     assert "Samantha" not in prompt
     assert "Monday" in prompt  # 2026-10-26 is a Monday
     assert "Ethan" in prompt
-    assert "Tool rules" in prompt
+    assert "Tool rules" in prompt and "kitchen safety tools" in prompt
     assert "Tool rules" not in LLMClient.build_system_prompt(NOW, "", profile, with_tools=False)
 
 
@@ -472,3 +472,43 @@ def test_claims_action_qwen_phrasings(text, offered_text, claims):
 
 def test_bare_capitalised_tool_name():
     assert LLMClient._text_tool_calls("Timer_status", None) == [("call_text_0", "timer_status", {})]
+
+
+def test_tool_not_forced_by_groups_from_the_previous_reply(fake_llm):
+    history = [{"role": "user", "content": "my sister is allergic to peanuts"},
+               {"role": "assistant", "content": "I'll check the kitchen safety settings."}]
+    llm = fake_llm(["Oh no, I hope Milo feels better soon. Have you seen a vet?"])
+    reply = LLMClient.respond("my cat Milo has been sick lately", history, NOW)
+    assert reply.tools_used == [] and len(llm.requests) == 1
+
+
+def test_unbacked_promise_is_regenerated(fake_llm):
+    llm = fake_llm(["I'll make sure to remind you to keep peanuts away from Sarah.",
+                    "Thanks for telling me, I'll keep that in mind for when Sarah visits."])
+    reply = LLMClient.respond("my sister Sarah is allergic to peanuts", [], NOW)
+    assert reply.text.startswith("Thanks for telling me")
+    # A fresh retry with the instruction in the system prompt (not appended after the reply)
+    retry = llm.requests[1]["messages"]
+    assert retry[0]["content"].endswith(LLMClient.NO_PROMISES_NUDGE)
+    assert retry[-1] == {"role": "user", "content": "my sister Sarah is allergic to peanuts"}
+    assert "tools" not in llm.requests[1]
+
+
+def test_long_sentences_dont_pick_tools_from_the_last_reply():
+    history = [{"role": "assistant", "content": "I'll check the kitchen safety settings."}]
+    assert {LLMClient.TOOLS[n]["group"] for n in LLMClient.select_tools("my cat Milo has been sick lately", history)} == {"core"}
+    assert "clear_list" in LLMClient.select_tools("yes clear it", [{"role": "assistant", "content": "Clear the shopping list?"}])
+
+
+def test_promise_removed_if_regeneration_still_promises(fake_llm):
+    fake_llm(["I'll check the kitchen safety for Milo.",
+              "Oh no, poor Milo. I'll keep an eye on things. I hope he's better soon."])
+    reply = LLMClient.respond("my cat Milo has been sick lately", [], NOW)
+    assert reply.text == "Oh no, poor Milo. I hope he's better soon."
+
+
+def test_topic_rules_only_for_offered_groups():
+    chat = LLMClient.build_system_prompt(NOW, with_tools=True, tool_groups={"core"})
+    assert "kitchen safety" not in chat and "calculate" not in chat
+    safety = LLMClient.build_system_prompt(NOW, with_tools=True, tool_groups={"core", "hazards"})
+    assert "kitchen safety tools" in safety

@@ -144,5 +144,14 @@ LISTS_PATH         = CONFIG_DIR / "lists.json"
 NOTES_PATH         = CONFIG_DIR / "notes.json"
 WEATHER_CACHE_PATH = CONFIG_DIR / "weather_cache.json"
 WEATHER_CACHE_MAX_AGE_H = _get_float("WEATHER_CACHE_MAX_AGE_H", 6)
-# LM Studio embedding model for searching notes (falls back to keyword search)
+# LM Studio embedding model for searching notes and people facts (falls back to keyword search)
 EMBEDDING_MODEL    = _get_str("EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
+
+# ─── People memory (RAG) ──────────────────────────────────────────────────────
+PEOPLE_DB_PATH        = CONFIG_DIR / "people.db"
+MEMORY_FACTS_K        = int(_get_float("MEMORY_FACTS_K", 4))       # relevant facts added to each request
+# Below this a fact isn't "relevant". Measured with nomic-embed-text: related facts
+# scored 0.64-0.77, unrelated ones up to 0.56 ("what's the weather" vs "Mum likes gardening")
+MEMORY_MIN_SIMILARITY = _get_float("MEMORY_MIN_SIMILARITY", 0.6)
+MEMORY_DUPLICATE_SIMILARITY = _get_float("MEMORY_DUPLICATE_SIMILARITY", 0.9)  # treat as the same fact
+FACT_EXTRACTION_EVERY = int(_get_float("FACT_EXTRACTION_EVERY", 4))  # learn facts every N exchanges

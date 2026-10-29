@@ -65,12 +65,19 @@ def isolated_data(tmp_path, monkeypatch):
     data = tmp_path / "data"
     for name, filename in [("REMINDERS_PATH", "reminders.json"), ("LISTS_PATH", "lists.json"),
                            ("NOTES_PATH", "notes.json"), ("WEATHER_CACHE_PATH", "weather_cache.json"),
-                           ("EVENTS_DB_PATH", "events.db"), ("SNAPSHOT_DIR", "snapshots")]:
+                           ("EVENTS_DB_PATH", "events.db"), ("SNAPSHOT_DIR", "snapshots"),
+                           ("PEOPLE_DB_PATH", "people.db")]:
         monkeypatch.setattr(settings, name, data / filename)
+    import PeopleMemory
+    PeopleMemory.set_people_memory(None)          # recreated at the temp path on first use
     announcer = SilentAnnouncer()
     AnnouncerModule.set_announcer(announcer)
     yield announcer
     AnnouncerModule.set_announcer(None)
+    store = PeopleMemory._store
+    PeopleMemory.set_people_memory(None)
+    if store is not None:
+        store.close()
 
 
 @pytest.fixture
